@@ -1,0 +1,8 @@
+Guarda la imagen del avatar de Lushu's en esta carpeta con el nombre:
+
+  lushu-avatar.png
+
+La imagen debe ir en:  C:\Users\yoga\Desktop\Urnas\public\lushu-avatar.png
+
+Si no agregas la imagen, el botón mostrará una "L" azul como fallback.
+Puedes eliminar este archivo de instrucciones luego.

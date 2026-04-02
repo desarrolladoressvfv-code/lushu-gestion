@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(py --version)",
+      "Bash(where python:*)",
+      "Bash(where python3:*)",
+      "Bash(py -3 --version)",
+      "Bash(/c/Python*/python.exe)",
+      "Bash(--version)",
+      "Bash(ls /c/Python*)",
+      "Read(//c/Users/yoga/AppData/Local/Programs/Python//**)",
+      "Bash(/c/Users/yoga/AppData/Local/Programs/Python/Python312/python.exe --version)",
+      "Bash(PYTHON=\"/c/Users/yoga/AppData/Local/Programs/Python/Python312/python.exe\")",
+      "Bash($PYTHON -c \":*)",
+      "Bash($PYTHON -m pip install openpyxl pandas -q)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(dir \"C:\\\\Users\\\\yoga\\\\Desktop\\\\Urnas\" /b)",
+      "Bash(findstr /i \"env\")",
+      "Bash(dir \"C:\\\\Users\\\\yoga\\\\Desktop\\\\Urnas\" /b /a)",
+      "Bash(ls \"C:/Users/yoga/Desktop/Urnas/.env\"*)"
+    ]
+  }
+}
