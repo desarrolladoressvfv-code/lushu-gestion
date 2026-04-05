@@ -144,7 +144,7 @@ export default function Inventario() {
     : rows
 
   const alertas         = filtrados.filter(r => r.stock_actual <= r.stock_minimo)
-  const totalProductos  = filtrados.length
+  const totalProductos  = filtrados.reduce((sum, r) => sum + (r.stock_actual || 0), 0)
   const normal          = filtrados.filter(r => r.stock_actual > (r.stock_minimo ?? 0)).length
   const critico         = filtrados.filter(r => r.stock_actual > 0 && r.stock_actual <= (r.stock_minimo ?? 0)).length
   const sinStock        = filtrados.filter(r => r.stock_actual === 0).length
@@ -159,7 +159,7 @@ export default function Inventario() {
       icon: Package,
       label: 'Total Productos',
       value: totalProductos,
-      sub: filtroSucursal ? 'en sucursal seleccionada' : 'en todas las sucursales',
+      sub: filtroSucursal ? 'unidades en sucursal seleccionada' : 'unidades en todas las sucursales',
       gradient: 'from-blue-500 to-blue-600',
     },
     {

@@ -123,8 +123,8 @@ export default function Login() {
         <div className="w-full max-w-md">
 
           {/* Logo mobile */}
-          <div className="flex lg:hidden justify-center mb-10">
-            <BiKloudLogo width={280} animated />
+          <div className="flex lg:hidden justify-center mb-8 px-4">
+            <BiKloudLogo width="100%" animated />
           </div>
 
           {/* Formulario */}

@@ -3,7 +3,6 @@ import { supabase, CLIENTE_ID } from '../lib/supabase'
 
 const EmpresaContext = createContext({
   nombreEmpresa:    'Mi Empresa',
-  logoUrl:          null,
   alertas:          { cheques: 0, stockBajo: 0, pagoPendiente: 0 },
   cargandoEmpresa:  true,
   errorEmpresa:     null,
@@ -13,26 +12,19 @@ const EmpresaContext = createContext({
 
 export function EmpresaProvider({ children }) {
   const [nombreEmpresa,   setNombreEmpresa]   = useState('Mi Empresa')
-  const [logoUrl,         setLogoUrl]         = useState(null)
   const [alertas,         setAlertas]         = useState({ cheques: 0, stockBajo: 0, pagoPendiente: 0 })
   const [cargandoEmpresa, setCargandoEmpresa] = useState(true)
   const [errorEmpresa,    setErrorEmpresa]    = useState(null)   // M2
 
-  /* ── Carga inicial: nombre + logo de la empresa ─────── */
+  /* ── Carga inicial: nombre de la empresa ─────── */
   async function cargarEmpresa() {
     try {
-      const { data: cliente, error } = await supabase
-        .from('clientes')
-        .select('nombre, logo_url')
-        .eq('id', CLIENTE_ID)
-        .single()
-
+      const { data, error } = await supabase.rpc('get_mi_empresa')
       if (error) throw error
 
-      const nombre = cliente?.nombre || 'Mi Empresa'
+      const nombre = data?.[0]?.nombre || 'Mi Empresa'
       setNombreEmpresa(nombre)
       document.title = `BiKloud · ${nombre}`
-      if (cliente?.logo_url) setLogoUrl(cliente.logo_url)
       setErrorEmpresa(null)
     } catch {
       setErrorEmpresa('No se pudo cargar la información de la empresa.')
@@ -71,15 +63,12 @@ export function EmpresaProvider({ children }) {
   /* ── Actualizar nombre desde Configuración ───────────── */
   async function actualizarNombre(nuevoNombre) {
     const nombre = nuevoNombre?.trim() || 'Mi Empresa'
-    const { error } = await supabase
-      .from('clientes')
-      .update({ nombre })
-      .eq('id', CLIENTE_ID)
-    if (!error) {
+    const { data, error } = await supabase.rpc('actualizar_nombre_empresa', { p_nombre: nombre })
+    if (!error && data) {
       setNombreEmpresa(nombre)
       document.title = `BiKloud · ${nombre}`
     }
-    return !error
+    return !error && !!data
   }
 
   useEffect(() => {
@@ -100,9 +89,11 @@ export function EmpresaProvider({ children }) {
           filter: `id=eq.${CLIENTE_ID}`,
         },
         (payload) => {
-          const nombre = payload.new?.nombre || 'Mi Empresa'
-          setNombreEmpresa(nombre)
-          document.title = `BiKloud · ${nombre}`
+          const nombre = payload.new?.nombre
+          if (nombre) {
+            setNombreEmpresa(nombre)
+            document.title = `BiKloud · ${nombre}`
+          }
         }
       )
       .subscribe()
@@ -121,7 +112,6 @@ export function EmpresaProvider({ children }) {
   return (
     <EmpresaContext.Provider value={{
       nombreEmpresa,
-      logoUrl,
       alertas,
       cargandoEmpresa,
       errorEmpresa,
