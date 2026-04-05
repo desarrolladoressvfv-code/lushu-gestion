@@ -25,24 +25,42 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function cargarPerfil(userId) {
+    // 1. Obtener rol y nombre del usuario
     const { data: usuario } = await supabase
       .from('usuarios')
       .select('rol, cliente_id, nombre')
       .eq('auth_user_id', userId)
       .single()
 
+    // Los superadmin no necesitan verificación de licencia
+    if (usuario?.rol === 'superadmin') {
+      setPerfil(usuario)
+      setCargando(false)
+      return
+    }
+
     if (usuario?.cliente_id) {
-      // Carga estado del cliente para saber si está activo
-      const { data: cliente } = await supabase
-        .from('clientes')
-        .select('estado, fecha_vencimiento, nombre')
-        .eq('id', usuario.cliente_id)
-        .single()
-      usuario.clienteEstado = cliente?.estado
-      usuario.clienteVencimiento = cliente?.fecha_vencimiento
-      usuario.nombreEmpresa = cliente?.nombre
-      // Actualiza el CLIENTE_ID global para que todos los componentes lo usen
-      setClienteId(usuario.cliente_id)
+      // 2. Verificación de licencia en el SERVIDOR mediante función PostgreSQL.
+      //    El servidor usa auth.uid() del JWT para identificar al usuario —
+      //    no puede ser manipulado desde el navegador.
+      const { data: licencia, error: licErr } = await supabase.rpc('verificar_licencia')
+
+      if (licErr || !licencia?.activo) {
+        // Licencia inválida — bloquear acceso con la razón del servidor
+        usuario.clienteEstado  = 'bloqueado'
+        usuario.licenciaRazon  = licencia?.razon || 'Error al verificar licencia'
+      } else {
+        // Licencia válida — poblar perfil con datos del servidor
+        usuario.clienteEstado        = 'activo'
+        usuario.clienteVencimiento   = licencia.fecha_vencimiento
+        usuario.nombreEmpresa        = licencia.nombre
+        usuario.plan                 = licencia.plan        || 'basico'
+        usuario.max_sucursales       = licencia.max_sucursales || 1
+        usuario.onboardingCompletado = licencia.onboarding_completado ?? false
+        setClienteId(usuario.cliente_id)
+        // M10: título dinámico al iniciar sesión
+        if (licencia.nombre) document.title = `BiKloud · ${licencia.nombre}`
+      }
     }
 
     setPerfil(usuario || null)
@@ -52,14 +70,38 @@ export function AuthProvider({ children }) {
   async function logout() {
     await supabase.auth.signOut()
     setPerfil(null)
+    setClienteId(null)          // Limpia CLIENTE_ID para que no quede el del usuario anterior
+    document.title = 'BiKloud'  // Restaura el título sin nombre de empresa
   }
 
-  const esSuperAdmin = perfil?.rol === 'superadmin'
-  const clienteActivo = perfil?.clienteEstado === 'activo' &&
-    new Date(perfil?.clienteVencimiento) >= new Date()
+  async function completarOnboarding() {
+    if (!perfil?.cliente_id) return
+    await supabase
+      .from('clientes')
+      .update({ onboarding_completado: true })
+      .eq('id', perfil.cliente_id)
+    setPerfil(p => ({ ...p, onboardingCompletado: true }))
+  }
+
+  async function reiniciarOnboarding() {
+    if (!perfil?.cliente_id) return
+    await supabase
+      .from('clientes')
+      .update({ onboarding_completado: false })
+      .eq('id', perfil.cliente_id)
+    setPerfil(p => ({ ...p, onboardingCompletado: false }))
+  }
+
+  const esSuperAdmin  = perfil?.rol === 'superadmin'
+  // El servidor ya verificó estado y vencimiento — solo leemos su respuesta
+  const clienteActivo = perfil?.clienteEstado === 'activo'
 
   return (
-    <AuthContext.Provider value={{ session, perfil, cargando, esSuperAdmin, clienteActivo, logout }}>
+    <AuthContext.Provider value={{
+      session, perfil, cargando,
+      esSuperAdmin, clienteActivo,
+      logout, completarOnboarding, reiniciarOnboarding,
+    }}>
       {children}
     </AuthContext.Provider>
   )

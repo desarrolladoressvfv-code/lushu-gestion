@@ -35,8 +35,11 @@ export default function FormasPago() {
   const totalCuotas = rows.reduce((s, r) => s + (r.monto_cuotas || 0), 0)
 
   async function cambiarEstado(id, nuevoEstado) {
-    await supabase.from('formas_pago').update({ estado: nuevoEstado }).eq('id', id)
-    cargar()
+    // B7: al marcar pagado → saldo_pendiente = 0 para que el dashboard sea correcto
+    const updates = { estado: nuevoEstado }
+    if (nuevoEstado === 'pagado') updates.saldo_pendiente = 0
+    const { error } = await supabase.from('formas_pago').update(updates).eq('id', id)
+    if (!error) cargar()
   }
 
   function exportar() {

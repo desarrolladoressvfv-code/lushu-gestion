@@ -69,7 +69,6 @@ const SUGERENCIAS = [
 
 export default function ChatBot() {
   const { nombreEmpresa, alertas } = useEmpresa()
-  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
 
   const [abierto, setAbierto] = useState(false)
   const [historial, setHistorial] = useState([])       // { role, content }
@@ -77,6 +76,11 @@ export default function ChatBot() {
   const [cargando, setCargando] = useState(false)
   const [inicializado, setInicializado] = useState(false)
   const [hayAlertasChat, setHayAlertasChat] = useState(false)
+
+  // M9: límite de mensajes por sesión para controlar costos de API
+  const LIMITE_MENSAJES = 20   // máx. intercambios usuario→asistente por sesión
+  const mensajesUsuario = historial.filter(m => m.role === 'user').length
+  const limiteAlcanzado = mensajesUsuario >= LIMITE_MENSAJES
 
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
@@ -105,15 +109,6 @@ export default function ChatBot() {
     setInicializado(true)
     setCargando(true)
 
-    if (!apiKey || apiKey.includes('REEMPLAZA')) {
-      setHistorial([{
-        role: 'assistant',
-        content: '⚠️ No encontré la API key de Anthropic.\n\nAgrega tu clave en el archivo `.env`:\n\n**VITE_ANTHROPIC_API_KEY=sk-ant-...**\n\nLuego reinicia el servidor con `npm run dev`.',
-      }])
-      setCargando(false)
-      return
-    }
-
     try {
       const contexto = await fetchContexto(['base'])
       const base = contexto.base || {}
@@ -134,7 +129,7 @@ export default function ChatBot() {
 4. Termina con una frase motivadora breve
 Máximo 180 palabras. Usa viñetas y emojis para el resumen.`
 
-      const respuesta = await llamarClaude(systemPrompt, [{ role: 'user', content: prompt }], apiKey)
+      const respuesta = await llamarClaude(systemPrompt, [{ role: 'user', content: prompt }])
       setHistorial([{ role: 'assistant', content: respuesta }])
     } catch (e) {
       setHistorial([{
@@ -148,7 +143,7 @@ Máximo 180 palabras. Usa viñetas y emojis para el resumen.`
 
   async function enviarMensaje(textoDirecto) {
     const msg = textoDirecto || input.trim()
-    if (!msg || cargando) return
+    if (!msg || cargando || limiteAlcanzado) return
     setInput('')
 
     const nuevoHistorial = [...historial, { role: 'user', content: msg }]
@@ -163,7 +158,7 @@ Máximo 180 palabras. Usa viñetas y emojis para el resumen.`
       // Máximo últimos 12 mensajes para no superar tokens
       const historialAPI = nuevoHistorial.slice(-12)
 
-      const respuesta = await llamarClaude(systemPrompt, historialAPI, apiKey)
+      const respuesta = await llamarClaude(systemPrompt, historialAPI)
       setHistorial(prev => [...prev, { role: 'assistant', content: respuesta }])
     } catch (e) {
       setHistorial(prev => [...prev, {
@@ -294,33 +289,50 @@ Máximo 180 palabras. Usa viñetas y emojis para el resumen.`
 
         {/* Input */}
         <div className="p-3 border-t border-sky-100/60 flex-shrink-0" style={{ background: 'rgba(232,244,253,0.95)' }}>
-          <div className="flex items-end gap-2">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  enviarMensaje()
-                }
-              }}
-              rows={1}
-              placeholder="Escribe tu pregunta..."
-              className="flex-1 resize-none border border-sky-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition-shadow text-slate-800 placeholder-sky-400"
-              style={{ background: 'rgba(255,255,255,0.7)', minHeight: '42px', maxHeight: '96px' }}
-            />
-            <button
-              onClick={() => enviarMensaje()}
-              disabled={!input.trim() || cargando}
-              className="flex-shrink-0 w-[42px] h-[42px] bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl flex items-center justify-center transition-all active:scale-95"
-            >
-              <Send className="w-3.5 h-3.5" />
-            </button>
-          </div>
-          <p className="text-xs text-slate-400 mt-1.5 text-center">
-            Enter para enviar · Shift+Enter para nueva línea
-          </p>
+          {limiteAlcanzado ? (
+            <div className="text-center py-2">
+              <p className="text-xs text-amber-700 font-semibold bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                Límite de {LIMITE_MENSAJES} mensajes por sesión alcanzado.
+              </p>
+              <button onClick={reiniciarChat}
+                className="mt-2 text-xs text-blue-600 hover:text-blue-800 font-semibold underline transition-colors">
+                Reiniciar conversación
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-end gap-2">
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      enviarMensaje()
+                    }
+                  }}
+                  rows={1}
+                  placeholder="Escribe tu pregunta..."
+                  className="flex-1 resize-none border border-sky-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent transition-shadow text-slate-800 placeholder-sky-400"
+                  style={{ background: 'rgba(255,255,255,0.7)', minHeight: '42px', maxHeight: '96px' }}
+                />
+                <button
+                  onClick={() => enviarMensaje()}
+                  disabled={!input.trim() || cargando}
+                  className="flex-shrink-0 w-[42px] h-[42px] bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl flex items-center justify-center transition-all active:scale-95"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <p className="text-xs text-slate-400 mt-1.5 text-center">
+                Enter para enviar · Shift+Enter para nueva línea
+                {mensajesUsuario > 0 && (
+                  <span className="ml-2 text-slate-300">· {LIMITE_MENSAJES - mensajesUsuario} restantes</span>
+                )}
+              </p>
+            </>
+          )}
         </div>
       </div>
 
@@ -334,6 +346,7 @@ Máximo 180 palabras. Usa viñetas y emojis para el resumen.`
 
       {/* ── Botón flotante ── */}
       <button
+        id="chatbot-fab"
         onClick={() => setAbierto(true)}
         title="Abrir Lushu's"
         className={`fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full

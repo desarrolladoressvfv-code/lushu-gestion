@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase, CLIENTE_ID, clp } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { Save, Plus, Trash2, AlertTriangle, CheckCircle } from 'lucide-react'
+import { hoyCL } from '../lib/fecha'
 
 const chequeVacio = () => ({ monto: '', numero_documento: '', vencimiento: '' })
 
@@ -33,7 +34,7 @@ export default function FormularioNuevo() {
   const [stockInfo, setStockInfo] = useState(null)
 
   const [servicio, setServicio] = useState({
-    fecha_servicio: new Date().toISOString().split('T')[0],
+    fecha_servicio: hoyCL(),
     nombre_cliente: '',
     telefono: '',
     producto_id: '',
@@ -108,105 +109,60 @@ export default function FormularioNuevo() {
 
   async function guardar() {
     if (!numeroFormulario) { setError('El N° de formulario aún no se generó. Recarga la página e intenta de nuevo.'); return }
-    if (!servicio.nombre_cliente) { setError('El nombre del cliente es obligatorio.'); return }
+    if (!servicio.nombre_cliente.trim()) { setError('El nombre del cliente es obligatorio.'); return }
     if (sinStock) { setError('No hay stock disponible para la urna seleccionada.'); return }
     setError('')
     setGuardando(true)
     try {
-      const nroFormulario = numeroFormulario
-      const { data: svcData, error: svcErr } = await supabase.from('servicios').insert({
-        cliente_id: CLIENTE_ID,
-        numero_formulario: nroFormulario,
-        fecha_servicio: servicio.fecha_servicio,
-        nombre_cliente: servicio.nombre_cliente,
-        telefono: servicio.telefono,
-        producto_id: servicio.producto_id || null,
-        sucursal_id: servicio.sucursal_id || null,
-        color: servicio.color,
-        lugar_retiro: servicio.lugar_retiro,
-        lugar_servicio: servicio.lugar_servicio,
-        cementerio: servicio.cementerio,
-        trabajador_id: servicio.trabajador_id || null,
-      }).select().single()
-      if (svcErr) throw svcErr
-      const servicio_id = svcData.id
-
-      await supabase.from('ventas').insert({
-        cliente_id: CLIENTE_ID, servicio_id,
-        numero_formulario: nroFormulario,
-        fecha_servicio: servicio.fecha_servicio,
-        sucursal_id: servicio.sucursal_id || null,
-        producto_id: servicio.producto_id || null,
-        valor_servicio: venta.valor_servicio,
-        valor_adicional: Number(venta.valor_adicional),
-        total, descuento: Number(venta.descuento),
-        venta_neta, iva, venta_total,
+      // ── Transacción atómica en el servidor ───────────────────
+      // Todo ocurre dentro de una función PostgreSQL: si algo falla,
+      // PostgreSQL hace rollback automático y ningún dato queda a medias.
+      const { error } = await supabase.rpc('registrar_servicio_completo', {
+        // Servicio
+        p_cliente_id:          CLIENTE_ID,
+        p_numero_formulario:   numeroFormulario,
+        p_fecha_servicio:      servicio.fecha_servicio,
+        p_nombre_cliente:      servicio.nombre_cliente.trim(),
+        p_telefono:            servicio.telefono || null,
+        p_producto_id:         servicio.producto_id || null,
+        p_sucursal_id:         servicio.sucursal_id || null,
+        p_color:               servicio.color || null,
+        p_lugar_retiro:        servicio.lugar_retiro || null,
+        p_lugar_servicio:      servicio.lugar_servicio || null,
+        p_cementerio:          servicio.cementerio || null,
+        p_trabajador_id:       servicio.trabajador_id || null,
+        // Venta
+        p_valor_servicio:      venta.valor_servicio,
+        p_valor_adicional:     Number(venta.valor_adicional) || 0,
+        p_total:               total,
+        p_descuento:           Number(venta.descuento) || 0,
+        p_venta_neta:          venta_neta,
+        p_iva:                 iva,
+        p_venta_total:         venta_total,
+        // Formas de pago
+        p_convenio_id:         pago.convenio_id || null,
+        p_valor_convenio:      Number(pago.valor_convenio) || 0,
+        p_efectivo:            Number(pago.efectivo) || 0,
+        p_tarjeta:             Number(pago.tarjeta) || 0,
+        p_monto_cuotas:        Number(pago.monto_cuotas) || 0,
+        p_cuotas:              Number(pago.cuotas) || 0,
+        p_valor_cheques:       total_cheques,
+        p_saldo_pendiente:     saldo_pendiente,
+        p_estado_pago:         estado_pago,
+        p_info_adicional:      pago.info_adicional || null,
+        // Cheques (solo los que tienen monto)
+        p_cheques:             cheques.filter(c => Number(c.monto) > 0),
+        // Fallecido
+        p_fallecido_nombre:    fallecido.nombre || null,
+        p_fallecido_sexo:      fallecido.sexo || null,
+        p_fallecido_edad:      fallecido.edad ? Number(fallecido.edad) : null,
+        p_fallecido_rut:       fallecido.rut || null,
+        p_fallecido_fecha_def: fallecido.fecha_defuncion || null,
+        p_fallecido_causa:     fallecido.causa_muerte || null,
+        p_fallecido_comuna:    fallecido.comuna || null,
       })
 
-      await supabase.from('formas_pago').insert({
-        cliente_id: CLIENTE_ID, servicio_id,
-        numero_formulario: nroFormulario,
-        fecha: servicio.fecha_servicio,
-        sucursal_id: servicio.sucursal_id || null,
-        venta_total,
-        convenio_id: pago.convenio_id || null,
-        valor_convenio: Number(pago.valor_convenio),
-        efectivo: Number(pago.efectivo),
-        tarjeta: Number(pago.tarjeta),
-        monto_cuotas: Number(pago.monto_cuotas),
-        cuotas: Number(pago.cuotas),
-        valor_cheques: total_cheques,
-        saldo_pendiente,
-        estado: estado_pago,
-        info_adicional: pago.info_adicional,
-      })
-
-      const chequesValidos = cheques.filter(c => Number(c.monto) > 0)
-      if (chequesValidos.length > 0) {
-        await supabase.from('cheques').insert(
-          chequesValidos.map(c => ({
-            cliente_id: CLIENTE_ID, servicio_id,
-            numero_formulario: nroFormulario,
-            monto: Number(c.monto),
-            numero_documento: c.numero_documento,
-            vencimiento: c.vencimiento || null,
-            estado: 'vigente',
-          }))
-        )
-      }
-
-      if (fallecido.nombre) {
-        await supabase.from('fallecidos').insert({
-          cliente_id: CLIENTE_ID, servicio_id,
-          numero_formulario: nroFormulario,
-          fecha_servicio: servicio.fecha_servicio,
-          nombre: fallecido.nombre,
-          sexo: fallecido.sexo || null,
-          edad: fallecido.edad ? Number(fallecido.edad) : null,
-          rut: fallecido.rut,
-          fecha_defuncion: fallecido.fecha_defuncion || null,
-          causa_muerte: fallecido.causa_muerte,
-          comuna: fallecido.comuna,
-        })
-      }
-
-      if (servicio.producto_id) {
-        let q = supabase.from('inventario').select('id, stock_actual')
-          .eq('cliente_id', CLIENTE_ID).eq('producto_id', servicio.producto_id)
-        if (servicio.sucursal_id) q = q.eq('sucursal_id', servicio.sucursal_id)
-        else q = q.is('sucursal_id', null)
-        const { data: inv } = await q.maybeSingle()
-        if (inv) {
-          await supabase.from('inventario').update({ stock_actual: Math.max(0, inv.stock_actual - 1) }).eq('id', inv.id)
-          await supabase.from('movimientos_inventario').insert({
-            cliente_id: CLIENTE_ID, producto_id: servicio.producto_id,
-            tipo: 'salida', cantidad: 1,
-            motivo: `Servicio N° ${nroFormulario}`,
-            referencia_id: servicio_id,
-            fecha: servicio.fecha_servicio,
-          })
-        }
-      }
+      if (error) throw error
       navigate('/servicios')
     } catch (e) {
       setError(e.message || 'Error al guardar. Revisa los datos e intenta de nuevo.')
@@ -227,10 +183,6 @@ export default function FormularioNuevo() {
             </p>
           )}
         </div>
-        <button onClick={guardar} disabled={guardando || sinStock} className="btn-primary">
-          <Save className="w-4 h-4" />
-          {guardando ? 'Guardando...' : 'Guardar Servicio'}
-        </button>
       </div>
 
       {/* Error */}

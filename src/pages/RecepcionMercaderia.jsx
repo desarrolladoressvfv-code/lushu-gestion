@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase, CLIENTE_ID, clp } from '../lib/supabase'
 import { CheckCircle, Package } from 'lucide-react'
+import { hoyCL } from '../lib/fecha'
 
 export default function RecepcionMercaderia() {
   const [ordenes, setOrdenes] = useState([])
@@ -92,7 +93,7 @@ export default function RecepcionMercaderia() {
         cantidad: item.cantidad,
         motivo: `Recepción OC - ${oc.proveedores?.nombre || 'Proveedor'}`,
         referencia_id: oc.id,
-        fecha: new Date().toISOString().split('T')[0],
+        fecha: hoyCL(),
       })
     }
   }

@@ -23,11 +23,18 @@ const TITULOS = {
 export default function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
-  const { nombreEmpresa } = useEmpresa()
+  const { nombreEmpresa, cargandoEmpresa } = useEmpresa()
   const titulo = TITULOS[location.pathname] || 'Gestión'
 
   // Cerrar sidebar al navegar
   useEffect(() => { setSidebarOpen(false) }, [location.pathname])
+
+  // Abrir sidebar desde el tour (mobile)
+  useEffect(() => {
+    function handler() { setSidebarOpen(true) }
+    window.addEventListener('bikloud:open-sidebar', handler)
+    return () => window.removeEventListener('bikloud:open-sidebar', handler)
+  }, [])
 
   // Bloquear scroll cuando sidebar móvil está abierto
   useEffect(() => {
@@ -69,7 +76,10 @@ export default function Layout({ children }) {
 
           <div className="flex-1 min-w-0">
             <h2 className="text-base font-semibold text-slate-800 truncate">{titulo}</h2>
-            <p className="text-xs text-slate-400 hidden sm:block">{nombreEmpresa}</p>
+            {cargandoEmpresa
+              ? <div className="skeleton h-3 w-28 hidden sm:block" />
+              : <p className="text-xs text-slate-400 hidden sm:block">{nombreEmpresa}</p>
+            }
           </div>
 
           {/* Botón cerrar sidebar en tablet cuando está abierto */}

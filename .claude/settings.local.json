@@ -18,7 +18,8 @@
       "Bash(dir \"C:\\\\Users\\\\yoga\\\\Desktop\\\\Urnas\" /b)",
       "Bash(findstr /i \"env\")",
       "Bash(dir \"C:\\\\Users\\\\yoga\\\\Desktop\\\\Urnas\" /b /a)",
-      "Bash(ls \"C:/Users/yoga/Desktop/Urnas/.env\"*)"
+      "Bash(ls \"C:/Users/yoga/Desktop/Urnas/.env\"*)",
+      "Bash(npx supabase:*)"
     ]
   }
 }

@@ -3,6 +3,7 @@ import { supabase, CLIENTE_ID } from '../lib/supabase'
 import { Search, Download } from 'lucide-react'
 import { exportarExcel } from '../lib/exportExcel'
 import { SkeletonTabla } from '../components/SkeletonLoader'
+import Paginador, { usePaginacion } from '../components/Paginador'
 
 export default function Fallecidos() {
   const [rows, setRows] = useState([])
@@ -52,6 +53,9 @@ export default function Fallecidos() {
   }
 
   const hayFiltros = busqueda || fechaDesde || fechaHasta
+
+  // M1 — Paginación
+  const { pagina, setPagina, paginados } = usePaginacion(filtrados, 25)
 
   return (
     <div className="space-y-4 page-enter">
@@ -104,7 +108,7 @@ export default function Fallecidos() {
               <tbody className="divide-y divide-slate-50">
                 {filtrados.length === 0 ? (
                   <tr><td colSpan={9} className="text-center py-10 text-slate-400">Sin registros</td></tr>
-                ) : filtrados.map(r => (
+                ) : paginados.map(r => (
                   <tr key={r.id} className="tabla-fila">
                     <td className="px-4 py-3 font-mono font-bold text-blue-600">#{r.numero_formulario}</td>
                     <td className="px-4 py-3 font-medium text-slate-900">{r.nombre}</td>
@@ -124,6 +128,7 @@ export default function Fallecidos() {
               </tbody>
             </table>
           </div>
+          <Paginador pagina={pagina} totalItems={filtrados.length} porPagina={25} onChange={setPagina} />
         </div>
       )}
     </div>

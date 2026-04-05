@@ -2,16 +2,18 @@ import { useEffect, useState } from 'react'
 import { supabase, CLIENTE_ID, clp } from '../lib/supabase'
 import { generarCotizacionPDF } from '../lib/generarPDF'
 import { useEmpresa } from '../context/EmpresaContext'
-import { Download } from 'lucide-react'
+import { hoyCL } from '../lib/fecha'
+import { Download, AlertTriangle, PackageX } from 'lucide-react'
 
 export default function Cotizacion() {
   const { nombreEmpresa } = useEmpresa()
   const [productos, setProductos] = useState([])
   const [sucursales, setSucursales] = useState([])
   const [generando, setGenerando] = useState(false)
+  const [stockInfo, setStockInfo] = useState(null)   // null = no consultado aún
 
   const [form, setForm] = useState({
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: hoyCL(),
     nombre_cliente: '',
     telefono: '',
     nombre_servicio: '',
@@ -45,12 +47,42 @@ export default function Cotizacion() {
   const venta_total = Math.round(venta_neta * 1.19)
   const porc = total > 0 ? ((Number(form.descuento) / total) * 100).toFixed(1) : '0.0'
 
+  /* ── Verificar stock al cambiar producto o sucursal ── */
+  useEffect(() => {
+    async function verificarStock() {
+      if (!form.producto_id) { setStockInfo(null); return }
+
+      const query = supabase
+        .from('inventario')
+        .select('stock_actual, stock_minimo')
+        .eq('cliente_id', CLIENTE_ID)
+        .eq('producto_id', form.producto_id)
+
+      // Si hay sucursal seleccionada, filtra por ella; si no, toma la primera coincidencia
+      if (form.sucursal_id) query.eq('sucursal_id', form.sucursal_id)
+
+      const { data } = await query.maybeSingle()
+      setStockInfo(data ?? { stock_actual: 0, stock_minimo: 0 })
+    }
+    verificarStock()
+  }, [form.producto_id, form.sucursal_id])
+
   function handle(e) { setForm(f => ({ ...f, [e.target.name]: e.target.value })) }
+
+  const sinStock   = stockInfo !== null && stockInfo.stock_actual === 0
+  const stockBajo  = stockInfo !== null && stockInfo.stock_actual > 0
+                     && stockInfo.stock_actual <= (stockInfo.stock_minimo ?? 0)
 
   async function descargarPDF() {
     setGenerando(true)
     try {
+      // M4: obtener número correlativo desde Supabase
+      let numeroCotizacion = null
+      const { data: numData } = await supabase.rpc('get_next_cotizacion', { p_cliente_id: CLIENTE_ID })
+      if (numData) numeroCotizacion = numData
+
       generarCotizacionPDF({
+        numeroCotizacion,
         fecha: form.fecha,
         nombreCliente: form.nombre_cliente,
         telefono: form.telefono,
@@ -82,10 +114,6 @@ export default function Cotizacion() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-slate-900">Cotización</h1>
-        <button onClick={descargarPDF} disabled={generando} className="btn-primary">
-          <Download className="w-4 h-4" />
-          {generando ? 'Generando...' : 'Descargar PDF'}
-        </button>
       </div>
 
       {/* Datos del cliente */}
@@ -148,6 +176,32 @@ export default function Cotizacion() {
         </div>
       </div>
 
+      {/* Banner de stock */}
+      {sinStock && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+          <PackageX className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-red-800 font-semibold text-sm">Sin stock disponible</p>
+            <p className="text-red-600 text-xs mt-0.5">
+              La urna seleccionada no tiene stock en esta sucursal. La cotización puede generarse, pero no podrá convertirse en servicio hasta reponer inventario.
+            </p>
+          </div>
+        </div>
+      )}
+      {stockBajo && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-amber-800 font-semibold text-sm">
+              Stock bajo — quedan {stockInfo.stock_actual} unidade{stockInfo.stock_actual !== 1 ? 's' : ''}
+            </p>
+            <p className="text-amber-600 text-xs mt-0.5">
+              El stock está igual o por debajo del mínimo configurado ({stockInfo.stock_minimo}).
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Valores */}
       <div className="form-section">
         <h2 className="text-base font-bold text-slate-800 mb-4 pb-2 border-b border-slate-100">Valores</h2>
@@ -193,8 +247,14 @@ export default function Cotizacion() {
         </div>
       </div>
 
-      <div className="flex justify-end pb-6">
-        <button onClick={descargarPDF} disabled={generando} className="btn-primary px-7 py-3">
+      <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pb-6">
+        {sinStock && (
+          <p className="text-xs text-red-500 font-medium">
+            ⚠ Sin stock — la cotización se genera igualmente como referencia
+          </p>
+        )}
+        <button onClick={descargarPDF} disabled={generando}
+          className={`btn-primary px-7 py-3 ${sinStock ? 'opacity-80' : ''}`}>
           <Download className="w-4 h-4" />
           {generando ? 'Generando PDF...' : 'Descargar PDF'}
         </button>

@@ -1,8 +1,11 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { TourProvider, useTour } from './context/TourContext'
 import { EmpresaProvider } from './context/EmpresaContext'
 import Layout from './components/Layout'
 import SuperAdminLayout from './components/SuperAdminLayout'
+import TourBiKloud from './components/TourBiKloud'
+import OnboardingWelcome from './pages/OnboardingWelcome'
 import Login from './pages/Login'
 import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard'
 import SuperAdminClientes from './pages/superadmin/SuperAdminClientes'
@@ -21,7 +24,7 @@ import RecepcionMercaderia from './pages/RecepcionMercaderia'
 import Configuracion from './pages/Configuracion'
 import ChatBot from './components/ChatBot'
 
-// Pantalla de carga
+/* ── Pantalla de carga ──────────────────────────────────── */
 function LoadingScreen() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-900">
@@ -33,20 +36,29 @@ function LoadingScreen() {
   )
 }
 
-// Pantalla de acceso bloqueado (cliente inactivo/vencido)
-function AccesoBloqueado({ logout }) {
+/* ── Acceso bloqueado ───────────────────────────────────── */
+function AccesoBloqueado({ logout, razon }) {
+  const mensajes = {
+    'Licencia vencida':      'Su licencia ha vencido.',
+    'Cuenta suspendida':     'Su cuenta ha sido suspendida.',
+    'Usuario no encontrado': 'Usuario no reconocido en el sistema.',
+    'Cliente no encontrado': 'No se encontró una cuenta asociada.',
+  }
+  const mensaje = mensajes[razon] || 'Su licencia ha vencido o ha sido desactivada.'
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4">
       <div className="bg-white rounded-2xl shadow-2xl p-10 max-w-md w-full text-center">
         <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
           <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
           </svg>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Servicio Suspendido</h1>
-        <p className="text-gray-500 text-sm mb-6">
-          Su licencia ha vencido o ha sido desactivada.<br />
-          Contacte al administrador para reactivar el acceso.
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Acceso Bloqueado</h1>
+        <p className="text-gray-500 text-sm mb-1">{mensaje}</p>
+        <p className="text-gray-400 text-xs mb-6">
+          Contacte al administrador de BiKloud para reactivar el acceso.
         </p>
         <button onClick={logout} className="text-sm text-slate-500 hover:text-slate-700 underline transition-colors">
           Cerrar sesión
@@ -56,57 +68,104 @@ function AccesoBloqueado({ logout }) {
   )
 }
 
-// Router interno que conoce el estado de auth
+/* ── Router principal ───────────────────────────────────── */
 function AppRouter() {
-  const { session, perfil, cargando, esSuperAdmin, clienteActivo, logout } = useAuth()
+  const { session, perfil, cargando, esSuperAdmin, clienteActivo, logout, completarOnboarding } = useAuth()
+  const { fase, setFase } = useTour()
 
   if (cargando) return <LoadingScreen />
-  if (!session) return <Login />
+  if (!session)  return <Login />
 
-  // Portal superadmin
+  /* Portal superadmin */
   if (esSuperAdmin) {
     return (
       <BrowserRouter>
         <SuperAdminLayout>
           <Routes>
-            <Route path="/superadmin" element={<SuperAdminDashboard />} />
+            <Route path="/superadmin"          element={<SuperAdminDashboard />} />
             <Route path="/superadmin/clientes" element={<SuperAdminClientes />} />
-            <Route path="*" element={<Navigate to="/superadmin" replace />} />
+            <Route path="*"                    element={<Navigate to="/superadmin" replace />} />
           </Routes>
         </SuperAdminLayout>
       </BrowserRouter>
     )
   }
 
-  // Cliente bloqueado / sin perfil
+  /* Cliente bloqueado / sin perfil */
   if (!perfil || !clienteActivo) {
-    return <AccesoBloqueado logout={logout} />
+    return <AccesoBloqueado logout={logout} razon={perfil?.licenciaRazon} />
   }
 
-  // Portal cliente
+  /* Portal cliente */
+  const esPro = perfil?.plan === 'profesional' || perfil?.plan === 'enterprise'
+
+  // Determinar si mostrar bienvenida:
+  // fase 'bienvenida' explícita (ej: repetir tour desde config)
+  // O nunca hizo onboarding y el tour aún no fue iniciado
+  const mostrarBienvenida =
+    fase === 'bienvenida' ||
+    (!fase && perfil && !perfil.onboardingCompletado)
+
+  async function handleSaltar() {
+    await completarOnboarding()
+    setFase(null)
+  }
+
+  async function handleComenzarTour() {
+    // M6: marcar completado ANTES de iniciar el tour para que
+    // una recarga en medio del tour no reinicie la bienvenida
+    await completarOnboarding()
+    setFase('tour')
+  }
+
+  async function handleFinTour() {
+    await completarOnboarding()
+    setFase(null)
+  }
+
   return (
     <BrowserRouter>
       <EmpresaProvider>
+
+        {/* ── Overlay de bienvenida ────────────────────────── */}
+        {mostrarBienvenida && (
+          <OnboardingWelcome
+            onComenzar={handleComenzarTour}
+            onSaltar={handleSaltar}
+          />
+        )}
+
+        {/* ── Layout principal ─────────────────────────────── */}
         <Layout>
           <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/formulario" element={<FormularioNuevo />} />
-            <Route path="/cotizacion" element={<Cotizacion />} />
-            <Route path="/servicios" element={<Servicios />} />
-            <Route path="/ventas" element={<Ventas />} />
-            <Route path="/formas-pago" element={<FormasPago />} />
-            <Route path="/cheques" element={<Cheques />} />
-            <Route path="/fallecidos" element={<Fallecidos />} />
-            <Route path="/inventario" element={<Inventario />} />
-            <Route path="/movimientos" element={<MovimientosInventario />} />
-            <Route path="/compras" element={<Compras />} />
-            <Route path="/recepcion" element={<RecepcionMercaderia />} />
+            <Route path="/"              element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard"     element={<Dashboard />} />
+            <Route path="/formulario"    element={<FormularioNuevo />} />
+            <Route path="/cotizacion"    element={esPro ? <Cotizacion />            : <Navigate to="/dashboard" replace />} />
+            <Route path="/servicios"     element={<Servicios />} />
+            <Route path="/ventas"        element={esPro ? <Ventas />               : <Navigate to="/dashboard" replace />} />
+            <Route path="/formas-pago"   element={esPro ? <FormasPago />           : <Navigate to="/dashboard" replace />} />
+            <Route path="/cheques"       element={esPro ? <Cheques />              : <Navigate to="/dashboard" replace />} />
+            <Route path="/fallecidos"    element={<Fallecidos />} />
+            <Route path="/inventario"    element={<Inventario />} />
+            <Route path="/movimientos"   element={esPro ? <MovimientosInventario /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/compras"       element={esPro ? <Compras />              : <Navigate to="/dashboard" replace />} />
+            <Route path="/recepcion"     element={esPro ? <RecepcionMercaderia />  : <Navigate to="/dashboard" replace />} />
             <Route path="/configuracion" element={<Configuracion />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*"              element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Layout>
-        <ChatBot />
+
+        {/* ── ChatBot (Pro) ────────────────────────────────── */}
+        {esPro && <ChatBot />}
+
+        {/* ── Tour Driver.js ───────────────────────────────── */}
+        <TourBiKloud
+          activo={fase === 'tour'}
+          esPro={esPro}
+          onFin={handleFinTour}
+        />
+
       </EmpresaProvider>
     </BrowserRouter>
   )
@@ -115,7 +174,9 @@ function AppRouter() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppRouter />
+      <TourProvider>
+        <AppRouter />
+      </TourProvider>
     </AuthProvider>
   )
 }

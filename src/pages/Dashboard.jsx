@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase, CLIENTE_ID, clp } from '../lib/supabase'
+import { hoyCL, haceNmesesCL } from '../lib/fecha'
 import { ClipboardList, DollarSign, AlertTriangle, CheckSquare, Package, ShoppingCart, TrendingUp, Users, ArrowRight, Building2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { SkeletonKPI, SkeletonGrafico, SkeletonTabla } from '../components/SkeletonLoader'
@@ -87,10 +88,14 @@ export default function Dashboard() {
 
   const cargar = useCallback(async (filtroSuc) => {
     setLoading(true)
-    const hoy = new Date()
-    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0]
-    const en7d = new Date(hoy.getTime() + 7 * 86400000).toISOString().split('T')[0]
-    const hoyStr = hoy.toISOString().split('T')[0]
+    // M7: fechas en timezone Chile para evitar desfase UTC
+    const hoy       = hoyCL()
+    const [yy, mm]  = hoy.split('-').map(Number)
+    const inicioMes = `${yy}-${String(mm).padStart(2, '0')}-01`
+    const hace12m   = haceNmesesCL(12)
+    const en7dDate  = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))
+    en7dDate.setDate(en7dDate.getDate() + 7)
+    const en7d      = en7dDate.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' })
 
     // Helper para aplicar filtro de sucursal
     const conFiltro = (q) => filtroSuc ? q.eq('sucursal_id', filtroSuc) : q
@@ -99,7 +104,7 @@ export default function Dashboard() {
       { data: serviciosMes },
       { data: todasVentas },
       { data: pagos },
-      { data: cheques },
+      { data: cheques },     // B4: incluye vencidos (sin .gte) + próximos 7 días
       { data: inventario },
       { data: ultimosSvc },
       { data: ocPendientes },
@@ -107,9 +112,11 @@ export default function Dashboard() {
       { data: totalSvc },
     ] = await Promise.all([
       conFiltro(supabase.from('servicios').select('id').eq('cliente_id', CLIENTE_ID).gte('fecha_servicio', inicioMes)),
-      conFiltro(supabase.from('ventas').select('venta_total, fecha_servicio, productos(nombre)').eq('cliente_id', CLIENTE_ID)),
+      // B1: limitado a últimos 12 meses — antes cargaba TODO el histórico
+      conFiltro(supabase.from('ventas').select('venta_total, fecha_servicio, productos(nombre)').eq('cliente_id', CLIENTE_ID).gte('fecha_servicio', hace12m)),
       conFiltro(supabase.from('formas_pago').select('saldo_pendiente, efectivo, tarjeta, valor_convenio, valor_cheques, monto_cuotas').eq('cliente_id', CLIENTE_ID)),
-      supabase.from('cheques').select('id, monto, vencimiento').eq('cliente_id', CLIENTE_ID).eq('estado', 'vigente').lte('vencimiento', en7d).gte('vencimiento', hoyStr),
+      // B4: sin .gte → incluye vencidos + próximos 7 días (ambos son alertas urgentes)
+      supabase.from('cheques').select('id, monto, vencimiento').eq('cliente_id', CLIENTE_ID).eq('estado', 'vigente').lte('vencimiento', en7d),
       conFiltro(supabase.from('inventario').select('stock_actual, stock_minimo, producto_id, sucursal_id, productos(nombre), sucursales(nombre)').eq('cliente_id', CLIENTE_ID)),
       conFiltro(supabase.from('servicios').select('numero_formulario, fecha_servicio, nombre_cliente, productos(nombre), sucursales(nombre)').eq('cliente_id', CLIENTE_ID).order('created_at', { ascending: false }).limit(5)),
       filtroSuc
@@ -174,9 +181,10 @@ export default function Dashboard() {
   useEffect(() => {
     if (loading) return
     setLoadingGraf(true)
+    const hace12mGraf = haceNmesesCL(12)
     const q = sucursalFiltro
-      ? supabase.from('ventas').select('venta_total, fecha_servicio').eq('cliente_id', CLIENTE_ID).eq('sucursal_id', sucursalFiltro)
-      : supabase.from('ventas').select('venta_total, fecha_servicio').eq('cliente_id', CLIENTE_ID)
+      ? supabase.from('ventas').select('venta_total, fecha_servicio').eq('cliente_id', CLIENTE_ID).eq('sucursal_id', sucursalFiltro).gte('fecha_servicio', hace12mGraf)
+      : supabase.from('ventas').select('venta_total, fecha_servicio').eq('cliente_id', CLIENTE_ID).gte('fecha_servicio', hace12mGraf)
     q.then(({ data }) => { setVentasData(agruparVentas(data || [], periodo)); setLoadingGraf(false) })
   }, [periodo])
 
@@ -197,7 +205,7 @@ export default function Dashboard() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
           <p className="text-sm text-slate-400 mt-0.5">
-            {new Date().toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            {new Date().toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Santiago' })}
           </p>
         </div>
 

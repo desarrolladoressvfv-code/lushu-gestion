@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useLocation, Link } from 'react-router-dom'
-import { LayoutDashboard, Users, LogOut, Menu, X, Sparkles, ChevronRight, Shield } from 'lucide-react'
+import { LayoutDashboard, Users, LogOut, Menu, X, ChevronRight, Shield } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import bikloudLogo from '../assets/bikloud-logo-white.svg'
 
 const NAV_ITEMS = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/superadmin' },
@@ -21,15 +22,8 @@ export default function SuperAdminLayout({ children }) {
 
         {/* Brand */}
         <div className="p-5 border-b border-slate-800/80">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30 flex-shrink-0">
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <p className="text-white font-bold text-sm leading-none">Lushu's</p>
-              <p className="text-slate-400 text-xs mt-0.5">Panel Administrador</p>
-            </div>
-          </div>
+          <img src={bikloudLogo} alt="BiKloud" className="w-32 mb-1" />
+          <p className="text-slate-500 text-xs">Panel Administrador</p>
         </div>
 
         {/* Admin badge */}
@@ -93,11 +87,8 @@ export default function SuperAdminLayout({ children }) {
           <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg hover:bg-slate-100 transition-colors">
             <Menu className="w-5 h-5 text-slate-600" />
           </button>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center">
-              <Sparkles className="w-3 h-3 text-white" />
-            </div>
-            <p className="font-semibold text-slate-800 text-sm">Panel Admin</p>
+          <div className="flex items-center">
+            <p className="font-semibold text-slate-800 text-sm">BiKloud · Panel Admin</p>
           </div>
         </header>
 

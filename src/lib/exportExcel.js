@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx'
+import { hoyCL } from './fecha'
 
 export function exportarExcel(datos, nombreHoja, nombreArchivo) {
   const wb = XLSX.utils.book_new()
@@ -11,7 +12,7 @@ export function exportarExcel(datos, nombreHoja, nombreArchivo) {
   ws['!cols'] = cols
 
   XLSX.utils.book_append_sheet(wb, ws, nombreHoja)
-  XLSX.writeFile(wb, `${nombreArchivo}_${new Date().toISOString().split('T')[0]}.xlsx`)
+  XLSX.writeFile(wb, `${nombreArchivo}_${hoyCL()}.xlsx`)
 }
 
 export function clpTexto(valor) {

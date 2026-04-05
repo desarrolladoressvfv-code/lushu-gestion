@@ -1,12 +1,13 @@
 import { supabase, CLIENTE_ID } from './supabase'
+import { hoyCL } from './fecha'
 
 // ─── Utilidades de fecha ────────────────────────────────────────────────────
-const hoy = () => new Date().toISOString().split('T')[0]
+const hoy = () => hoyCL()
 
 const diasDesdeHoy = (n) => {
-  const d = new Date()
+  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))
   d.setDate(d.getDate() + n)
-  return d.toISOString().split('T')[0]
+  return d.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' })
 }
 
 const inicioMes = () => {

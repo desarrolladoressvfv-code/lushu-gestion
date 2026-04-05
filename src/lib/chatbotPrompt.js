@@ -4,7 +4,7 @@ const clpStr = (n) =>
 // ─── System Prompt Builder ──────────────────────────────────────────────────
 export function buildSystemPrompt(nombreEmpresa, contexto) {
   const base = contexto.base || {}
-  const hora = new Date().getHours()
+  const hora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' })).getHours()
   const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
 
   let prompt = `Eres Lushu's, el asistente inteligente de negocio de ${nombreEmpresa}. Tu rol es ayudar al equipo a tomar mejores decisiones basándote en los datos reales del sistema.
@@ -20,7 +20,7 @@ PERSONALIDAD:
 SALUDO APROPIADO PARA ESTA HORA: "${saludo}"
 
 === DATOS EN TIEMPO REAL DEL SISTEMA ===
-Fecha actual: ${base.fecha_hoy || new Date().toISOString().split('T')[0]}
+Fecha actual: ${base.fecha_hoy || new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' })}
 `
 
   // Ventas del mes
@@ -153,19 +153,22 @@ Fecha actual: ${base.fecha_hoy || new Date().toISOString().split('T')[0]}
   return prompt
 }
 
-// ─── Llamada a la API de Claude ─────────────────────────────────────────────
-export async function llamarClaude(systemPrompt, historial, apiKey) {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+// ─── Llamada a la Edge Function proxy (API key queda en el servidor) ────────
+export async function llamarClaude(systemPrompt, historial) {
+  // Obtener el JWT del usuario autenticado
+  const { supabase } = await import('./supabase.js')
+  const { data: { session } } = await supabase.auth.getSession()
+
+  const edgeFnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`
+
+  const response = await fetch(edgeFnUrl, {
     method: 'POST',
     headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-      'anthropic-dangerous-direct-browser-access': 'true',
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session?.access_token ?? ''}`,
+      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
       system: systemPrompt,
       messages: historial,
     }),
@@ -173,9 +176,9 @@ export async function llamarClaude(systemPrompt, historial, apiKey) {
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}))
-    throw new Error(err?.error?.message || `Error HTTP ${response.status}`)
+    throw new Error(err?.error || `Error HTTP ${response.status}`)
   }
 
   const data = await response.json()
-  return data.content?.[0]?.text || 'No obtuve respuesta. Intenta de nuevo.'
+  return data.text || 'No obtuve respuesta. Intenta de nuevo.'
 }

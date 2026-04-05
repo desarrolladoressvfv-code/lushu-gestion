@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase, CLIENTE_ID, clp } from '../lib/supabase'
 import { Plus, Trash2, Lock, X } from 'lucide-react'
 import { SkeletonTabla } from '../components/SkeletonLoader'
+import { hoyCL } from '../lib/fecha'
 
 const itemVacio = () => ({ producto_id: '', cantidad: 1, precio_unitario: '' })
 
@@ -20,7 +21,7 @@ export default function Compras() {
   const [modal, setModal] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [errorGuardar, setErrorGuardar] = useState('')
-  const [form, setForm] = useState({ proveedor_id: '', sucursal_id: '', fecha: new Date().toISOString().split('T')[0], notas: '' })
+  const [form, setForm] = useState({ proveedor_id: '', sucursal_id: '', fecha: hoyCL(), notas: '' })
   const [items, setItems] = useState([itemVacio()])
   const [alertaId, setAlertaId] = useState(null)
 
@@ -47,7 +48,7 @@ export default function Compras() {
   }
 
   function abrirModal() {
-    setForm({ proveedor_id: '', sucursal_id: '', fecha: new Date().toISOString().split('T')[0], notas: '' })
+    setForm({ proveedor_id: '', sucursal_id: '', fecha: hoyCL(), notas: '' })
     setItems([itemVacio()])
     setModal(true)
   }

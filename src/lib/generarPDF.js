@@ -5,7 +5,8 @@ export function generarCotizacionPDF(datos) {
     fecha, nombreCliente, telefono, nombreServicio, sucursalNombre,
     tipoUrna, color, lugarRetiro, lugarServicio, cementerio,
     valorServicio, valorAdicional, total, descuento, porcDescuento,
-    ventaNeta, iva, ventaTotal, comentarios, empresaNombre
+    ventaNeta, iva, ventaTotal, comentarios, empresaNombre,
+    numeroCotizacion,   // M4: número correlativo
   } = datos
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
@@ -24,7 +25,7 @@ export function generarCotizacionPDF(datos) {
   doc.setTextColor(255, 255, 255)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(22)
-  doc.text(empresaNombre || 'FUNERARIA', margen, 16)
+  doc.text(empresaNombre || 'Mi Empresa', margen, 16)
 
   // Subtítulo
   doc.setFont('helvetica', 'normal')
@@ -32,13 +33,20 @@ export function generarCotizacionPDF(datos) {
   doc.setTextColor(148, 163, 184)
   doc.text('Servicios Fúnebres Profesionales', margen, 23)
 
-  // Etiqueta COTIZACIÓN (derecha)
+  // Etiqueta COTIZACIÓN + número (derecha)
   doc.setFillColor(59, 130, 246)
-  doc.roundedRect(W - margen - 45, 8, 45, 18, 3, 3, 'F')
+  doc.roundedRect(W - margen - 48, 7, 48, numeroCotizacion ? 22 : 18, 3, 3, 'F')
   doc.setTextColor(255, 255, 255)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(13)
-  doc.text('COTIZACIÓN', W - margen - 22.5, 19, { align: 'center' })
+  doc.text('COTIZACIÓN', W - margen - 24, numeroCotizacion ? 16 : 19, { align: 'center' })
+  if (numeroCotizacion) {
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(219, 234, 254)
+    const numStr = `N° ${String(numeroCotizacion).padStart(4, '0')}`
+    doc.text(numStr, W - margen - 24, 24, { align: 'center' })
+  }
 
   y = 50
 

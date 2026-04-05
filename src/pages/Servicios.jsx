@@ -3,6 +3,7 @@ import { supabase, CLIENTE_ID } from '../lib/supabase'
 import { Search, Download } from 'lucide-react'
 import { exportarExcel } from '../lib/exportExcel'
 import { SkeletonTabla } from '../components/SkeletonLoader'
+import Paginador, { usePaginacion } from '../components/Paginador'
 
 export default function Servicios() {
   const [rows, setRows] = useState([])
@@ -45,6 +46,9 @@ export default function Servicios() {
     if (filtroHasta && r.fecha_servicio > filtroHasta) return false
     return true
   })
+
+  // M1 — Paginación
+  const { pagina, setPagina, paginados } = usePaginacion(filtrados, 25)
 
   function exportar() {
     const datos = filtrados.map(r => ({
@@ -116,7 +120,7 @@ export default function Servicios() {
               <tbody className="divide-y divide-slate-50">
                 {filtrados.length === 0 ? (
                   <tr><td colSpan={11} className="text-center py-10 text-slate-400">Sin registros</td></tr>
-                ) : filtrados.map(r => (
+                ) : paginados.map(r => (
                   <tr key={r.id} className="tabla-fila">
                     <td className="px-4 py-3 font-mono font-bold text-blue-600">#{r.numero_formulario}</td>
                     <td className="px-4 py-3 text-slate-600">{r.fecha_servicio}</td>
@@ -134,6 +138,7 @@ export default function Servicios() {
               </tbody>
             </table>
           </div>
+          <Paginador pagina={pagina} totalItems={filtrados.length} porPagina={25} onChange={setPagina} />
         </div>
       )}
     </div>

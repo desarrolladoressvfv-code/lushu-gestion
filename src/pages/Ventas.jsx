@@ -12,7 +12,7 @@ export default function Ventas() {
   const [busqueda, setBusqueda] = useState('')
 
   useEffect(() => {
-    let q = supabase.from('ventas').select('*, productos(nombre)')
+    let q = supabase.from('ventas').select('*, productos(nombre), sucursales(nombre)')
       .eq('cliente_id', CLIENTE_ID).order('fecha_servicio', { ascending: false })
     if (desde) q = q.gte('fecha_servicio', desde)
     if (hasta) q = q.lte('fecha_servicio', hasta)
@@ -43,16 +43,17 @@ export default function Ventas() {
 
   function exportar() {
     const datos = filtrados.map(r => ({
-      'N° Formulario': r.numero_formulario,
-      'Fecha': r.fecha_servicio,
-      'Urna': r.productos?.nombre || '',
+      'N° Formulario':  r.numero_formulario,
+      'Fecha':          r.fecha_servicio,
+      'Urna':           r.productos?.nombre  || '',
+      'Sucursal':       r.sucursales?.nombre || '',
       'Valor Servicio': r.valor_servicio,
-      'Valor Adicional': r.valor_adicional,
-      'Total': r.total,
-      'Descuento': r.descuento,
-      'Venta Neta': r.venta_neta,
-      'IVA': r.iva,
-      'Venta Total': r.venta_total,
+      'Valor Adicional':r.valor_adicional,
+      'Total':          r.total,
+      'Descuento':      r.descuento,
+      'Venta Neta':     r.venta_neta,
+      'IVA':            r.iva,
+      'Venta Total':    r.venta_total,
     }))
     exportarExcel(datos, 'Ventas', 'Ventas')
   }
