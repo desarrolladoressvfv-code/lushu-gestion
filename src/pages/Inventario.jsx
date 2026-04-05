@@ -122,11 +122,17 @@ export default function Inventario() {
       .eq('id', id)
 
     if (!error) {
-      // Actualización optimista → KPI cards se recalculan al instante
       setRows(prev =>
         prev.map(r => r.id === id ? { ...r, stock_minimo: nuevoMinimo } : r)
       )
       setToast({ mensaje: `Stock mínimo actualizado a ${nuevoMinimo}`, tipo: 'ok' })
+      // S2: log de auditoría
+      const prod = rows.find(r => r.id === id)
+      supabase.rpc('registrar_auditoria', {
+        p_accion: 'editar',
+        p_modulo: 'inventario',
+        p_descripcion: `Stock mínimo de "${prod?.productos?.nombre || id}" actualizado a ${nuevoMinimo}`,
+      })
     } else {
       setToast({ mensaje: 'Error al actualizar el stock mínimo', tipo: 'error' })
     }

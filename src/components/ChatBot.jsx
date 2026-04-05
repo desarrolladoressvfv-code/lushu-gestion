@@ -105,6 +105,13 @@ export default function ChatBot() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
+  // S4 — Alt+B toggle desde useAtajos
+  useEffect(() => {
+    const handler = () => setAbierto(v => !v)
+    window.addEventListener('bikloud:toggle-chatbot', handler)
+    return () => window.removeEventListener('bikloud:toggle-chatbot', handler)
+  }, [])
+
   async function generarSaludo() {
     setInicializado(true)
     setCargando(true)

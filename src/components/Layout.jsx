@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Menu, X } from 'lucide-react'
+import { Menu, X, Search } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import { useEmpresa } from '../context/EmpresaContext'
+import OfflineBanner from './OfflineBanner'
+import BusquedaGlobal from './BusquedaGlobal'
+import { useAtajos } from '../hooks/useAtajos'
 
 const TITULOS = {
   '/dashboard': 'Dashboard',
@@ -42,8 +45,15 @@ export default function Layout({ children }) {
     return () => { document.body.style.overflow = '' }
   }, [sidebarOpen])
 
+  // S4 — Atajos de teclado globales
+  useAtajos()
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
+      {/* S1 — Banner offline */}
+      <OfflineBanner />
+      {/* S5 — Búsqueda global */}
+      <BusquedaGlobal />
       {/* Sidebar desktop (≥1024px) */}
       <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:flex-shrink-0 shadow-xl shadow-slate-900/20 z-20">
         <Sidebar />
@@ -81,6 +91,15 @@ export default function Layout({ children }) {
               : <p className="text-xs text-slate-400 hidden sm:block">{nombreEmpresa}</p>
             }
           </div>
+
+          {/* S5 — Botón búsqueda global */}
+          <button
+            onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))}
+            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 text-xs transition-colors">
+            <Search className="w-3.5 h-3.5" />
+            <span>Buscar</span>
+            <kbd className="bg-white border border-slate-200 px-1.5 py-0.5 rounded text-[10px] font-mono">Ctrl K</kbd>
+          </button>
 
           {/* Botón cerrar sidebar en tablet cuando está abierto */}
           {sidebarOpen && (

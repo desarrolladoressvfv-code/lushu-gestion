@@ -39,7 +39,31 @@ export default function FormasPago() {
     const updates = { estado: nuevoEstado }
     if (nuevoEstado === 'pagado') updates.saldo_pendiente = 0
     const { error } = await supabase.from('formas_pago').update(updates).eq('id', id)
-    if (!error) cargar()
+    if (!error) {
+      // S3: notificar por email si pasa a pendiente
+      if (nuevoEstado === 'pendiente') {
+        const fila = rows.find(r => r.id === id)
+        const { data: { session } } = await supabase.auth.getSession()
+        const { data: cliente } = await supabase.from('clientes').select('email_admin').eq('id', fila?.cliente_id).maybeSingle()
+        if (cliente?.email_admin && fila) {
+          fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notificar-pago-pendiente`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session?.access_token}`,
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+            body: JSON.stringify({
+              numero_formulario: fila.numero_formulario,
+              saldo_pendiente: fila.saldo_pendiente || 0,
+              nombre_cliente: fila.convenios?.nombre || `Formulario #${fila.numero_formulario}`,
+              email_admin: cliente.email_admin,
+            }),
+          }).catch(() => {}) // silencioso: el email es best-effort
+        }
+      }
+      cargar()
+    }
   }
 
   function exportar() {

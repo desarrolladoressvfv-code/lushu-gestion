@@ -24,6 +24,37 @@ import RecepcionMercaderia from './pages/RecepcionMercaderia'
 import Configuracion from './pages/Configuracion'
 import ChatBot from './components/ChatBot'
 
+/* ── S6: Página de upgrade de plan ─────────────────────── */
+function PaginaUpgrade({ modulo }) {
+  return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="text-center max-w-sm px-4">
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/30">
+          <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-bold text-slate-900 mb-2">{modulo} es Pro</h2>
+        <p className="text-slate-500 text-sm mb-6">
+          Este módulo está disponible en el plan <span className="font-semibold text-blue-600">Profesional</span> o superior.
+          Actualiza tu plan para acceder a todas las funcionalidades.
+        </p>
+        <a href="mailto:contacto@bikloud.cl?subject=Upgrade de plan"
+          className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-violet-600
+                     hover:from-blue-500 hover:to-violet-500 text-white px-6 py-3 rounded-2xl
+                     font-semibold text-sm transition-all duration-200 shadow-lg shadow-blue-500/30
+                     hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-0.5">
+          Contactar para upgrade
+        </a>
+        <p className="text-xs text-slate-400 mt-4">
+          O escríbenos a <span className="font-medium">contacto@bikloud.cl</span>
+        </p>
+      </div>
+    </div>
+  )
+}
+
 /* ── Pantalla de carga ──────────────────────────────────── */
 function LoadingScreen() {
   return (
@@ -141,16 +172,16 @@ function AppRouter() {
             <Route path="/"              element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard"     element={<Dashboard />} />
             <Route path="/formulario"    element={<FormularioNuevo />} />
-            <Route path="/cotizacion"    element={esPro ? <Cotizacion />            : <Navigate to="/dashboard" replace />} />
+            <Route path="/cotizacion"    element={esPro ? <Cotizacion />            : <PaginaUpgrade modulo="Cotización" />} />
             <Route path="/servicios"     element={<Servicios />} />
-            <Route path="/ventas"        element={esPro ? <Ventas />               : <Navigate to="/dashboard" replace />} />
-            <Route path="/formas-pago"   element={esPro ? <FormasPago />           : <Navigate to="/dashboard" replace />} />
-            <Route path="/cheques"       element={esPro ? <Cheques />              : <Navigate to="/dashboard" replace />} />
+            <Route path="/ventas"        element={esPro ? <Ventas />               : <PaginaUpgrade modulo="Ventas" />} />
+            <Route path="/formas-pago"   element={esPro ? <FormasPago />           : <PaginaUpgrade modulo="Formas de Pago" />} />
+            <Route path="/cheques"       element={esPro ? <Cheques />              : <PaginaUpgrade modulo="Cheques" />} />
             <Route path="/fallecidos"    element={<Fallecidos />} />
             <Route path="/inventario"    element={<Inventario />} />
-            <Route path="/movimientos"   element={esPro ? <MovimientosInventario /> : <Navigate to="/dashboard" replace />} />
-            <Route path="/compras"       element={esPro ? <Compras />              : <Navigate to="/dashboard" replace />} />
-            <Route path="/recepcion"     element={esPro ? <RecepcionMercaderia />  : <Navigate to="/dashboard" replace />} />
+            <Route path="/movimientos"   element={esPro ? <MovimientosInventario /> : <PaginaUpgrade modulo="Movimientos de Inventario" />} />
+            <Route path="/compras"       element={esPro ? <Compras />              : <PaginaUpgrade modulo="Órdenes de Compra" />} />
+            <Route path="/recepcion"     element={esPro ? <RecepcionMercaderia />  : <PaginaUpgrade modulo="Recepción de Mercadería" />} />
             <Route path="/configuracion" element={<Configuracion />} />
             <Route path="*"              element={<Navigate to="/dashboard" replace />} />
           </Routes>

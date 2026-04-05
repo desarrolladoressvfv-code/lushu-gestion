@@ -60,6 +60,12 @@ export function AuthProvider({ children }) {
         setClienteId(usuario.cliente_id)
         // M10: título dinámico al iniciar sesión
         if (licencia.nombre) document.title = `BiKloud · ${licencia.nombre}`
+        // S2: registrar login en auditoría
+        supabase.rpc('registrar_auditoria', {
+          p_accion: 'login',
+          p_modulo: 'sesion',
+          p_descripcion: `Inicio de sesión`,
+        })
       }
     }
 

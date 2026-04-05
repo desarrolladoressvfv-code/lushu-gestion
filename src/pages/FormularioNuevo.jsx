@@ -163,6 +163,12 @@ export default function FormularioNuevo() {
       })
 
       if (error) throw error
+      // S2: log de auditoría
+      supabase.rpc('registrar_auditoria', {
+        p_accion: 'crear',
+        p_modulo: 'servicios',
+        p_descripcion: `Nuevo servicio creado para "${servicio.nombre_cliente}"`,
+      })
       navigate('/servicios')
     } catch (e) {
       setError(e.message || 'Error al guardar. Revisa los datos e intenta de nuevo.')
