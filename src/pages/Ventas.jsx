@@ -20,7 +20,7 @@ export default function Ventas() {
 
   useEffect(() => {
     let q = supabase.from('ventas').select('*, productos(nombre), sucursales(nombre)')
-      .eq('cliente_id', CLIENTE_ID).order('fecha_servicio', { ascending: false })
+      .eq('cliente_id', CLIENTE_ID).order('numero_formulario', { ascending: false })
     if (desde) q = q.gte('fecha_servicio', desde)
     if (hasta) q = q.lte('fecha_servicio', hasta)
     if (sucursalFiltro) q = q.eq('sucursal_id', sucursalFiltro)

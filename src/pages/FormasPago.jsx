@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase, CLIENTE_ID, clp } from '../lib/supabase'
-import { Search, Download, DollarSign, CreditCard, CheckSquare, AlertCircle } from 'lucide-react'
+import { Search, Download, DollarSign, CreditCard, CheckSquare, AlertCircle, ClipboardCheck } from 'lucide-react'
 import { exportarExcel } from '../lib/exportExcel'
 import { SkeletonTabla } from '../components/SkeletonLoader'
 
@@ -9,11 +9,12 @@ export default function FormasPago() {
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
+  const [tab, setTab] = useState('registros') // 'registros' | 'seguimiento'
 
   async function cargar() {
     const { data } = await supabase.from('formas_pago')
       .select('*, convenios(nombre)').eq('cliente_id', CLIENTE_ID)
-      .order('fecha', { ascending: false })
+      .order('numero_formulario', { ascending: false })
     setRows(data || [])
     setLoading(false)
   }
@@ -40,6 +41,12 @@ export default function FormasPago() {
     if (nuevoEstado === 'pagado') updates.saldo_pendiente = 0
     const { error } = await supabase.from('formas_pago').update(updates).eq('id', id)
     if (!error) {
+      const fila = rows.find(r => r.id === id)
+      supabase.rpc('registrar_auditoria', {
+        p_accion: 'actualizar',
+        p_modulo: 'formas_pago',
+        p_descripcion: `Formulario #${fila?.numero_formulario} marcado como "${nuevoEstado}"`,
+      })
       // S3: notificar por email si pasa a pendiente
       if (nuevoEstado === 'pendiente') {
         const fila = rows.find(r => r.id === id)
@@ -97,9 +104,27 @@ export default function FormasPago() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-slate-900">Formas de Pago</h1>
-        <button onClick={exportar} className="btn-excel">
-          <Download className="w-4 h-4" /> Excel
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Tabs */}
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
+            <button onClick={() => setTab('registros')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${tab === 'registros' ? 'bg-white shadow text-blue-600 font-semibold' : 'text-slate-500 hover:text-slate-700'}`}>
+              <CreditCard className="w-3.5 h-3.5" /> Registros
+            </button>
+            <button onClick={() => setTab('seguimiento')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${tab === 'seguimiento' ? 'bg-white shadow text-amber-600 font-semibold' : 'text-slate-500 hover:text-slate-700'}`}>
+              <ClipboardCheck className="w-3.5 h-3.5" /> Cuentas por cobrar
+              {rows.filter(r => r.saldo_pendiente > 0).length > 0 && (
+                <span className="bg-amber-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold">
+                  {rows.filter(r => r.saldo_pendiente > 0).length}
+                </span>
+              )}
+            </button>
+          </div>
+          <button onClick={exportar} className="btn-excel">
+            <Download className="w-4 h-4" /> Excel
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -138,68 +163,142 @@ export default function FormasPago() {
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="filtros-bar flex flex-wrap gap-3 items-center">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
-            className="input-base pl-9 w-52"
-            placeholder="Buscar N° formulario..." />
-        </div>
-        <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)} className="input-base w-auto">
-          <option value="">Todos los estados</option>
-          <option value="pagado">Pagado</option>
-          <option value="pendiente">Pendiente</option>
-        </select>
-      </div>
-
-      {loading ? <SkeletonTabla filas={6} cols={7} /> : (
-        <div className="tabla-panel">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-100">
-                <tr>
-                  {['N° Form.', 'Fecha', 'Venta Total', 'Convenio', 'Val. Convenio', 'Efectivo', 'Tarjeta', 'Cuotas', 'Cheques', 'Saldo', 'Estado', 'Info'].map(h => (
-                    <th key={h} className="text-left px-3 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {filtrados.length === 0 ? (
-                  <tr><td colSpan={12} className="text-center py-10 text-slate-400">Sin registros</td></tr>
-                ) : filtrados.map(r => (
-                  <tr key={r.id} className="tabla-fila">
-                    <td className="px-3 py-3 font-mono font-bold text-blue-600">#{r.numero_formulario}</td>
-                    <td className="px-3 py-3 text-slate-600">{r.fecha}</td>
-                    <td className="px-3 py-3 font-medium text-right text-money">{clp(r.venta_total)}</td>
-                    <td className="px-3 py-3 text-slate-500">{r.convenios?.nombre || '-'}</td>
-                    <td className="px-3 py-3 text-right text-money">{clp(r.valor_convenio)}</td>
-                    <td className="px-3 py-3 text-right text-money">{clp(r.efectivo)}</td>
-                    <td className="px-3 py-3 text-right text-money">{clp(r.tarjeta)}</td>
-                    <td className="px-3 py-3 text-right text-slate-500 text-money">
-                      {clp(r.monto_cuotas)}{r.cuotas > 0 ? ` (${r.cuotas}c)` : ''}
-                    </td>
-                    <td className="px-3 py-3 text-right text-money">{clp(r.valor_cheques)}</td>
-                    <td className={`px-3 py-3 text-right font-bold text-money ${r.saldo_pendiente > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                      {clp(r.saldo_pendiente)}
-                    </td>
-                    <td className="px-3 py-3">
-                      <select value={r.estado} onChange={e => cambiarEstado(r.id, e.target.value)}
-                        className={`text-xs font-semibold px-2.5 py-1 rounded-full border-0 cursor-pointer ${
-                          r.estado === 'pagado' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                        }`}>
-                        <option value="pagado">Pagado</option>
-                        <option value="pendiente">Pendiente</option>
-                      </select>
-                    </td>
-                    <td className="px-3 py-3 text-slate-500 max-w-xs truncate">{r.info_adicional || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Tab: Registros */}
+      {tab === 'registros' && (<>
+        <div className="filtros-bar flex flex-wrap gap-3 items-center">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
+              className="input-base pl-9 w-52"
+              placeholder="Buscar N° formulario..." />
           </div>
+          <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)} className="input-base w-auto">
+            <option value="">Todos los estados</option>
+            <option value="pagado">Pagado</option>
+            <option value="pendiente">Pendiente</option>
+          </select>
         </div>
-      )}
+
+        {loading ? <SkeletonTabla filas={6} cols={7} /> : (
+          <div className="tabla-panel">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 border-b border-slate-100">
+                  <tr>
+                    {['N° Form.', 'Fecha', 'Venta Total', 'Convenio', 'Val. Convenio', 'Efectivo', 'Tarjeta', 'Cuotas', 'Valor/Cuota', 'Cheques', 'Saldo', 'Estado', 'Info'].map(h => (
+                      <th key={h} className="text-left px-3 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {filtrados.length === 0 ? (
+                    <tr><td colSpan={13} className="text-center py-10 text-slate-400">Sin registros</td></tr>
+                  ) : filtrados.map(r => {
+                    const valorCuota = r.monto_cuotas > 0 && r.cuotas > 0
+                      ? Math.round(r.monto_cuotas / r.cuotas) : null
+                    return (
+                    <tr key={r.id} className="tabla-fila">
+                      <td className="px-3 py-3 font-mono font-bold text-blue-600">#{r.numero_formulario}</td>
+                      <td className="px-3 py-3 text-slate-600">{r.fecha}</td>
+                      <td className="px-3 py-3 font-medium text-right text-money">{clp(r.venta_total)}</td>
+                      <td className="px-3 py-3 text-slate-500">{r.convenios?.nombre || '-'}</td>
+                      <td className="px-3 py-3 text-right text-money">{clp(r.valor_convenio)}</td>
+                      <td className="px-3 py-3 text-right text-money">{clp(r.efectivo)}</td>
+                      <td className="px-3 py-3 text-right text-money">{clp(r.tarjeta)}</td>
+                      <td className="px-3 py-3 text-right text-slate-500 text-money">
+                        {clp(r.monto_cuotas)}{r.cuotas > 0 ? ` (${r.cuotas}c)` : ''}
+                      </td>
+                      <td className="px-3 py-3 text-right text-slate-500 text-money">
+                        {valorCuota ? clp(valorCuota) : '-'}
+                      </td>
+                      <td className="px-3 py-3 text-right text-money">{clp(r.valor_cheques)}</td>
+                      <td className={`px-3 py-3 text-right font-bold text-money ${r.saldo_pendiente > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                        {clp(r.saldo_pendiente)}
+                      </td>
+                      <td className="px-3 py-3">
+                        <select value={r.estado} onChange={e => cambiarEstado(r.id, e.target.value)}
+                          className={`text-xs font-semibold px-2.5 py-1 rounded-full border-0 cursor-pointer ${
+                            r.estado === 'pagado' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                          }`}>
+                          <option value="pagado">Pagado</option>
+                          <option value="pendiente">Pendiente</option>
+                        </select>
+                      </td>
+                      <td className="px-3 py-3 text-slate-500 max-w-xs truncate">{r.info_adicional || '-'}</td>
+                    </tr>
+                  )})}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </>)}
+
+      {/* Tab: Seguimiento / Cuentas por cobrar */}
+      {tab === 'seguimiento' && (() => {
+        const pendientes = rows.filter(r => r.saldo_pendiente > 0)
+        const totalPend = pendientes.reduce((s, r) => s + (r.saldo_pendiente || 0), 0)
+        return (
+          <div className="space-y-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-4">
+              <AlertCircle className="w-6 h-6 text-amber-600 flex-shrink-0" />
+              <div>
+                <p className="font-bold text-amber-800">{pendientes.length} cobro{pendientes.length !== 1 ? 's' : ''} pendiente{pendientes.length !== 1 ? 's' : ''}</p>
+                <p className="text-amber-700 text-sm">Total por cobrar: <span className="font-bold text-money">{clp(totalPend)}</span></p>
+              </div>
+            </div>
+            {pendientes.length === 0 ? (
+              <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-8 text-center">
+                <CheckSquare className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
+                <p className="text-emerald-700 font-semibold">Sin cobros pendientes</p>
+                <p className="text-emerald-600 text-sm mt-1">Todos los servicios están al día.</p>
+              </div>
+            ) : (
+              <div className="tabla-panel">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        {['N° Form.', 'Fecha', 'Venta Total', 'Saldo Pendiente', 'Convenio', 'Cuotas', 'Valor/Cuota', 'Info', 'Acción'].map(h => (
+                          <th key={h} className="text-left px-3 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {pendientes.map(r => {
+                        const valorCuota = r.monto_cuotas > 0 && r.cuotas > 0
+                          ? Math.round(r.monto_cuotas / r.cuotas) : null
+                        return (
+                          <tr key={r.id} className="tabla-fila bg-amber-50/30">
+                            <td className="px-3 py-3 font-mono font-bold text-blue-600">#{r.numero_formulario}</td>
+                            <td className="px-3 py-3 text-slate-600">{r.fecha}</td>
+                            <td className="px-3 py-3 text-right text-money font-medium">{clp(r.venta_total)}</td>
+                            <td className="px-3 py-3 text-right font-bold text-red-600 text-money">{clp(r.saldo_pendiente)}</td>
+                            <td className="px-3 py-3 text-slate-500">{r.convenios?.nombre || '-'}</td>
+                            <td className="px-3 py-3 text-center text-slate-600">
+                              {r.cuotas > 0 ? `${r.cuotas} cuotas` : '-'}
+                            </td>
+                            <td className="px-3 py-3 text-right text-money">
+                              {valorCuota ? clp(valorCuota) : '-'}
+                            </td>
+                            <td className="px-3 py-3 text-slate-500 max-w-xs truncate">{r.info_adicional || '-'}</td>
+                            <td className="px-3 py-3">
+                              <button onClick={() => cambiarEstado(r.id, 'pagado')}
+                                className="flex items-center gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-semibold transition-colors">
+                                <CheckSquare className="w-3.5 h-3.5" /> Marcar pagado
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 }

@@ -83,6 +83,11 @@ export default function Compras() {
         )
         if (itemsErr) throw itemsErr
       }
+      supabase.rpc('registrar_auditoria', {
+        p_accion: 'crear',
+        p_modulo: 'compras',
+        p_descripcion: `Nueva orden de compra creada (proveedor: ${proveedores.find(p => p.id === form.proveedor_id)?.nombre || form.proveedor_id})`,
+      })
       setModal(false)
       cargar()
     } catch (e) {
@@ -98,7 +103,14 @@ export default function Compras() {
     const { error } = await supabase.rpc('eliminar_orden_compra', { p_orden_id: pendingDelete.id })
     setEliminando(false)
     setPendingDelete(null)
-    if (!error) setOrdenes(prev => prev.filter(o => o.id !== pendingDelete.id))
+    if (!error) {
+      supabase.rpc('registrar_auditoria', {
+        p_accion: 'eliminar',
+        p_modulo: 'compras',
+        p_descripcion: `Orden de compra #${pendingDelete.id} eliminada`,
+      })
+      setOrdenes(prev => prev.filter(o => o.id !== pendingDelete.id))
+    }
   }
 
   return (

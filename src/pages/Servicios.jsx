@@ -34,7 +34,7 @@ export default function Servicios() {
   useEffect(() => {
     Promise.all([
       supabase.from('servicios').select('*, productos(nombre), trabajadores(nombre), sucursales(nombre)')
-        .eq('cliente_id', CLIENTE_ID).order('created_at', { ascending: false }),
+        .eq('cliente_id', CLIENTE_ID).order('numero_formulario', { ascending: false }),
       supabase.from('productos').select('id,nombre').eq('cliente_id', CLIENTE_ID).eq('activo', true).order('numero'),
       supabase.from('trabajadores').select('id,nombre').eq('cliente_id', CLIENTE_ID).eq('activo', true).order('numero'),
       supabase.from('sucursales').select('id,nombre').eq('cliente_id', CLIENTE_ID).eq('activo', true).order('nombre'),

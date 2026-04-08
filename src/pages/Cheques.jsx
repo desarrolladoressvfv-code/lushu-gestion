@@ -18,7 +18,7 @@ export default function Cheques() {
 
   async function cargar() {
     const { data } = await supabase.from('cheques').select('*')
-      .eq('cliente_id', CLIENTE_ID).order('vencimiento', { ascending: true })
+      .eq('cliente_id', CLIENTE_ID).order('numero_formulario', { ascending: false })
     setRows(data || [])
     setLoading(false)
   }
@@ -39,7 +39,15 @@ export default function Cheques() {
   })
 
   async function cambiarEstado(id, nuevoEstado) {
-    await supabase.from('cheques').update({ estado: nuevoEstado }).eq('id', id)
+    const { error } = await supabase.from('cheques').update({ estado: nuevoEstado }).eq('id', id)
+    if (!error) {
+      const cheque = rows.find(r => r.id === id)
+      supabase.rpc('registrar_auditoria', {
+        p_accion: 'actualizar',
+        p_modulo: 'cheques',
+        p_descripcion: `Cheque #${cheque?.numero_formulario || id} marcado como "${nuevoEstado}"`,
+      })
+    }
     cargar()
   }
 

@@ -31,7 +31,8 @@ export default function FormularioNuevo() {
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
   const [numeroFormulario, setNumeroFormulario] = useState(null)
-  const [stockInfo, setStockInfo] = useState(null)
+  const [stockInfo, setStockInfo] = useState(null)     // stock de la sucursal seleccionada
+  const [stockSucursales, setStockSucursales] = useState([]) // stock de todas las sucursales
 
   const [servicio, setServicio] = useState({
     fecha_servicio: hoyCL(),
@@ -78,6 +79,13 @@ export default function FormularioNuevo() {
   }, [servicio.producto_id, servicio.sucursal_id, productos])
 
   async function verificarStock(producto_id, sucursal_id) {
+    // Stock de todas las sucursales para el producto
+    const { data: todos } = await supabase.from('inventario')
+      .select('stock_actual, stock_minimo, sucursal_id, sucursales(nombre)')
+      .eq('cliente_id', CLIENTE_ID).eq('producto_id', producto_id)
+    setStockSucursales(todos || [])
+
+    // Stock de la sucursal seleccionada (o sin sucursal)
     let q = supabase.from('inventario').select('stock_actual, stock_minimo')
       .eq('cliente_id', CLIENTE_ID).eq('producto_id', producto_id)
     if (sucursal_id) q = q.eq('sucursal_id', sucursal_id)
@@ -199,16 +207,37 @@ export default function FormularioNuevo() {
       )}
 
       {/* Alerta stock */}
-      {servicio.producto_id && stockInfo !== null && (
-        <div className={`rounded-xl px-4 py-3 text-sm flex items-center gap-2 border ${
+      {servicio.producto_id && (stockInfo !== null || stockSucursales.length > 0) && (
+        <div className={`rounded-xl px-4 py-3 text-sm border ${
           sinStock ? 'bg-red-50 border-red-200 text-red-700'
-          : stockInfo.stock_actual <= stockInfo.stock_minimo ? 'bg-amber-50 border-amber-200 text-amber-700'
+          : stockInfo && stockInfo.stock_actual <= stockInfo.stock_minimo ? 'bg-amber-50 border-amber-200 text-amber-700'
           : 'bg-emerald-50 border-emerald-200 text-emerald-700'
         }`}>
-          {sinStock ? <AlertTriangle className="w-4 h-4 flex-shrink-0" /> : <CheckCircle className="w-4 h-4 flex-shrink-0" />}
-          {sinStock
-            ? 'Sin stock disponible para esta urna. No es posible registrar el servicio.'
-            : `Stock disponible: ${stockInfo.stock_actual} unidad${stockInfo.stock_actual !== 1 ? 'es' : ''}`}
+          <div className="flex items-center gap-2 mb-1">
+            {sinStock ? <AlertTriangle className="w-4 h-4 flex-shrink-0" /> : <CheckCircle className="w-4 h-4 flex-shrink-0" />}
+            <span className="font-medium">
+              {sinStock
+                ? 'Sin stock en la sucursal seleccionada'
+                : stockInfo
+                  ? `Stock en sucursal: ${stockInfo.stock_actual} unidad${stockInfo.stock_actual !== 1 ? 'es' : ''}`
+                  : 'Stock no configurado para esta sucursal'}
+            </span>
+          </div>
+          {/* Detalle por sucursal si hay más de una */}
+          {stockSucursales.length > 1 && (
+            <div className="flex flex-wrap gap-2 mt-1.5 ml-6">
+              {stockSucursales.map(s => (
+                <span key={s.sucursal_id}
+                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    s.stock_actual <= 0 ? 'bg-red-100 text-red-700'
+                    : s.stock_actual <= s.stock_minimo ? 'bg-amber-100 text-amber-700'
+                    : 'bg-emerald-100 text-emerald-700'
+                  }`}>
+                  {s.sucursales?.nombre || 'Sin sucursal'}: {s.stock_actual}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -231,7 +260,9 @@ export default function FormularioNuevo() {
           </div>
           <div>
             <label className="label-base">Teléfono</label>
-            <input name="telefono" value={servicio.telefono} onChange={handleServ} className="input-base" placeholder="+56 9 ..." />
+            <input name="telefono" value={servicio.telefono} onChange={handleServ}
+              className="input-base" placeholder="+56 9 XXXX XXXX"
+              maxLength={15} inputMode="tel" />
           </div>
           <div>
             <label className="label-base">Sucursal</label>
@@ -357,6 +388,13 @@ export default function FormularioNuevo() {
             <label className="label-base">N° Cuotas</label>
             <input name="cuotas" value={pago.cuotas} onChange={handlePago} type="number" className="input-base" />
           </div>
+          {Number(pago.monto_cuotas) > 0 && Number(pago.cuotas) > 0 && (
+            <div>
+              <label className="label-base">Valor por Cuota</label>
+              <input readOnly value={clp(Math.round(Number(pago.monto_cuotas) / Number(pago.cuotas)))}
+                className="input-base bg-blue-50 text-blue-700 font-semibold" />
+            </div>
+          )}
         </div>
 
         {/* Cheques */}

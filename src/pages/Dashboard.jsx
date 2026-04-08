@@ -41,7 +41,9 @@ function formatFecha(fecha, periodo) {
 
 function agruparVentas(ventas, periodo) {
   const mapa = {}
-  ventas.forEach(v => {
+  // Ordenar cronológicamente antes de agrupar para preservar orden de inserción
+  const sorted = [...ventas].sort((a, b) => (a.fecha_servicio > b.fecha_servicio ? 1 : -1))
+  sorted.forEach(v => {
     const key = formatFecha(v.fecha_servicio, periodo)
     if (!key) return
     if (!mapa[key]) mapa[key] = { fecha: key, total: 0, cantidad: 0 }
@@ -99,14 +101,29 @@ export default function Dashboard() {
     en7dDate.setDate(en7dDate.getDate() + 7)
     const en7d      = en7dDate.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' })
 
-    // Helper para aplicar filtro de sucursal
+    // Helper para tablas que tienen sucursal_id
     const conFiltro = (q) => filtroSuc ? q.eq('sucursal_id', filtroSuc) : q
+
+    // Para tablas sin sucursal_id (cheques, fallecidos, formas_pago):
+    // obtenemos los numero_formulario de esa sucursal y filtramos por ellos
+    let formularios = null
+    if (filtroSuc) {
+      const { data: svcNums } = await supabase
+        .from('servicios').select('numero_formulario')
+        .eq('cliente_id', CLIENTE_ID).eq('sucursal_id', filtroSuc)
+      formularios = (svcNums || []).map(s => s.numero_formulario)
+    }
+    const conFiltroForm = (q) => {
+      if (formularios === null) return q
+      if (formularios.length === 0) return q.in('numero_formulario', [-1])
+      return q.in('numero_formulario', formularios)
+    }
 
     const [
       { data: serviciosMes },
       { data: todasVentas },
       { data: pagos },
-      { data: cheques },     // B4: incluye vencidos (sin .gte) + próximos 7 días
+      { data: cheques },
       { data: inventario },
       { data: ultimosSvc },
       { data: ocPendientes },
@@ -114,17 +131,19 @@ export default function Dashboard() {
       { data: totalSvc },
     ] = await Promise.all([
       conFiltro(supabase.from('servicios').select('id').eq('cliente_id', CLIENTE_ID).gte('fecha_servicio', inicioMes)),
-      // B1: limitado a últimos 12 meses — antes cargaba TODO el histórico
+      // B1: limitado a últimos 12 meses
       conFiltro(supabase.from('ventas').select('venta_total, fecha_servicio, productos(nombre)').eq('cliente_id', CLIENTE_ID).gte('fecha_servicio', hace12m)),
-      conFiltro(supabase.from('formas_pago').select('saldo_pendiente, efectivo, tarjeta, valor_convenio, valor_cheques, monto_cuotas').eq('cliente_id', CLIENTE_ID)),
-      // B4: sin .gte → incluye vencidos + próximos 7 días (ambos son alertas urgentes)
-      supabase.from('cheques').select('id, monto, vencimiento').eq('cliente_id', CLIENTE_ID).eq('estado', 'vigente').lte('vencimiento', en7d),
+      // formas_pago no tiene sucursal_id → filtrar por numero_formulario
+      conFiltroForm(supabase.from('formas_pago').select('saldo_pendiente, efectivo, tarjeta, valor_convenio, valor_cheques, monto_cuotas').eq('cliente_id', CLIENTE_ID)),
+      // cheques no tiene sucursal_id → filtrar por numero_formulario
+      conFiltroForm(supabase.from('cheques').select('id, monto, vencimiento').eq('cliente_id', CLIENTE_ID).eq('estado', 'vigente').lte('vencimiento', en7d)),
       conFiltro(supabase.from('inventario').select('stock_actual, stock_minimo, producto_id, sucursal_id, productos(nombre), sucursales(nombre)').eq('cliente_id', CLIENTE_ID)),
       conFiltro(supabase.from('servicios').select('numero_formulario, fecha_servicio, nombre_cliente, productos(nombre), sucursales(nombre)').eq('cliente_id', CLIENTE_ID).order('created_at', { ascending: false }).limit(5)),
       filtroSuc
         ? supabase.from('ordenes_compra').select('id').eq('cliente_id', CLIENTE_ID).eq('estado', 'pendiente').eq('sucursal_id', filtroSuc)
         : supabase.from('ordenes_compra').select('id').eq('cliente_id', CLIENTE_ID).eq('estado', 'pendiente'),
-      supabase.from('fallecidos').select('id').eq('cliente_id', CLIENTE_ID).gte('fecha_servicio', inicioMes),
+      // fallecidos no tiene sucursal_id → filtrar por numero_formulario
+      conFiltroForm(supabase.from('fallecidos').select('id').eq('cliente_id', CLIENTE_ID).gte('fecha_servicio', inicioMes)),
       filtroSuc
         ? supabase.from('servicios').select('id', { count: 'exact' }).eq('cliente_id', CLIENTE_ID).eq('sucursal_id', filtroSuc)
         : supabase.from('servicios').select('id', { count: 'exact' }).eq('cliente_id', CLIENTE_ID),
@@ -192,7 +211,7 @@ export default function Dashboard() {
     else q = q.gte('fecha_servicio', hace12mGraf)
     if (grafHasta) q = q.lte('fecha_servicio', grafHasta)
     q.then(({ data }) => { setVentasData(agruparVentas(data || [], periodo)); setLoadingGraf(false) })
-  }, [periodo, grafDesde, grafHasta])
+  }, [periodo, grafDesde, grafHasta, sucursalFiltro])
 
   const formatKpiValue = (cfg) => {
     if (!kpis) return '—'
