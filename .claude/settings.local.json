@@ -19,7 +19,8 @@
       "Bash(findstr /i \"env\")",
       "Bash(dir \"C:\\\\Users\\\\yoga\\\\Desktop\\\\Urnas\" /b /a)",
       "Bash(ls \"C:/Users/yoga/Desktop/Urnas/.env\"*)",
-      "Bash(npx supabase:*)"
+      "Bash(npx supabase:*)",
+      "Bash(powershell -Command \"Select-String -Path ''C:\\\\Users\\\\yoga\\\\Desktop\\\\Urnas\\\\landing\\\\index.html'' -Pattern ''<!--\\\\s*[A-ZÁÉÍÓÚ]'' | Select-Object LineNumber, Line\")"
     ]
   }
 }

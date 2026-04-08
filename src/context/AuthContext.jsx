@@ -25,10 +25,10 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function cargarPerfil(userId) {
-    // 1. Obtener rol y nombre del usuario
+    // 1. Obtener rol y datos del usuario
     const { data: usuario } = await supabase
       .from('usuarios')
-      .select('rol, cliente_id, nombre')
+      .select('rol, cliente_id, nombre, activo, debe_cambiar_pass, acceso_tipo, sucursal_id, modulos_permitidos')
       .eq('auth_user_id', userId)
       .single()
 
@@ -39,33 +39,40 @@ export function AuthProvider({ children }) {
       return
     }
 
+    // Usuario inactivo — bloquear acceso
+    if (usuario && usuario.activo === false) {
+      usuario.clienteEstado = 'bloqueado'
+      usuario.licenciaRazon = 'Usuario desactivado'
+      setPerfil(usuario)
+      setCargando(false)
+      return
+    }
+
     if (usuario?.cliente_id) {
-      // 2. Verificación de licencia en el SERVIDOR mediante función PostgreSQL.
-      //    El servidor usa auth.uid() del JWT para identificar al usuario —
-      //    no puede ser manipulado desde el navegador.
       const { data: licencia, error: licErr } = await supabase.rpc('verificar_licencia')
 
       if (licErr || !licencia?.activo) {
-        // Licencia inválida — bloquear acceso con la razón del servidor
-        usuario.clienteEstado  = 'bloqueado'
-        usuario.licenciaRazon  = licencia?.razon || 'Error al verificar licencia'
+        usuario.clienteEstado = 'bloqueado'
+        usuario.licenciaRazon = licencia?.razon || 'Error al verificar licencia'
       } else {
-        // Licencia válida — poblar perfil con datos del servidor
         usuario.clienteEstado        = 'activo'
         usuario.clienteVencimiento   = licencia.fecha_vencimiento
         usuario.nombreEmpresa        = licencia.nombre
-        usuario.plan                 = licencia.plan        || 'basico'
+        usuario.plan                 = licencia.plan           || 'basico'
         usuario.max_sucursales       = licencia.max_sucursales || 1
         usuario.onboardingCompletado = licencia.onboarding_completado ?? false
+        // Datos de rol extendido
+        usuario.debeCambiarPass      = usuario.debe_cambiar_pass ?? false
+        usuario.accesoTipo           = usuario.acceso_tipo        || 'general'
+        usuario.sucursalRestringida  = usuario.sucursal_id        || null
+        usuario.modulosPermitidos    = usuario.modulos_permitidos || []
         setClienteId(usuario.cliente_id)
-        // M10: título dinámico al iniciar sesión
         if (licencia.nombre) document.title = `BiKloud · ${licencia.nombre}`
-        // S2: registrar login en auditoría
+        // Registrar login + actualizar último acceso
         supabase.rpc('registrar_auditoria', {
-          p_accion: 'login',
-          p_modulo: 'sesion',
-          p_descripcion: `Inicio de sesión`,
+          p_accion: 'login', p_modulo: 'sesion', p_descripcion: 'Inicio de sesión',
         })
+        supabase.rpc('actualizar_ultimo_acceso')
       }
     }
 
@@ -74,10 +81,20 @@ export function AuthProvider({ children }) {
   }
 
   async function logout() {
+    supabase.rpc('registrar_auditoria', {
+      p_accion: 'logout', p_modulo: 'sesion', p_descripcion: 'Cierre de sesión',
+    })
     await supabase.auth.signOut()
     setPerfil(null)
-    setClienteId(null)          // Limpia CLIENTE_ID para que no quede el del usuario anterior
-    document.title = 'BiKloud'  // Restaura el título sin nombre de empresa
+    setClienteId(null)
+    document.title = 'BiKloud'
+  }
+
+  async function marcarPassCambiado() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    await supabase.from('usuarios').update({ debe_cambiar_pass: false }).eq('auth_user_id', user.id)
+    setPerfil(p => ({ ...p, debeCambiarPass: false }))
   }
 
   async function completarOnboarding() {
@@ -99,14 +116,15 @@ export function AuthProvider({ children }) {
   }
 
   const esSuperAdmin  = perfil?.rol === 'superadmin'
-  // El servidor ya verificó estado y vencimiento — solo leemos su respuesta
+  const esAdmin       = perfil?.rol === 'admin'
+  const esOperador    = perfil?.rol === 'operador'
   const clienteActivo = perfil?.clienteEstado === 'activo'
 
   return (
     <AuthContext.Provider value={{
       session, perfil, cargando,
-      esSuperAdmin, clienteActivo,
-      logout, completarOnboarding, reiniciarOnboarding,
+      esSuperAdmin, esAdmin, esOperador, clienteActivo,
+      logout, completarOnboarding, reiniciarOnboarding, marcarPassCambiado,
     }}>
       {children}
     </AuthContext.Provider>

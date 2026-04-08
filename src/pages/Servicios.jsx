@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase, CLIENTE_ID } from '../lib/supabase'
-import { Search, Download } from 'lucide-react'
+import { Search, Download, Trash2, AlertTriangle } from 'lucide-react'
 import { exportarExcel } from '../lib/exportExcel'
 import { SkeletonTabla } from '../components/SkeletonLoader'
 import Paginador, { usePaginacion } from '../components/Paginador'
@@ -18,6 +18,18 @@ export default function Servicios() {
   const [filtroSucursal, setFiltroSucursal] = useState('')
   const [filtroDesde, setFiltroDesde] = useState('')
   const [filtroHasta, setFiltroHasta] = useState('')
+
+  const [pendingDelete, setPendingDelete] = useState(null) // servicio a eliminar
+  const [eliminando, setEliminando] = useState(false)
+
+  async function eliminarServicio() {
+    if (!pendingDelete) return
+    setEliminando(true)
+    const { error } = await supabase.rpc('eliminar_servicio_completo', { p_servicio_id: pendingDelete.id })
+    setEliminando(false)
+    setPendingDelete(null)
+    if (!error) setRows(prev => prev.filter(r => r.id !== pendingDelete.id))
+  }
 
   useEffect(() => {
     Promise.all([
@@ -68,6 +80,7 @@ export default function Servicios() {
   }
 
   return (
+    <>
     <div className="space-y-4 page-enter">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -112,7 +125,7 @@ export default function Servicios() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
                 <tr>
-                  {['N° Form.', 'Fecha', 'Cliente', 'Teléfono', 'Urna', 'Color', 'Lugar Retiro', 'Lugar Servicio', 'Cementerio', 'Instalador', 'Sucursal'].map(h => (
+                  {['N° Form.', 'Fecha', 'Cliente', 'Teléfono', 'Urna', 'Color', 'Lugar Retiro', 'Lugar Servicio', 'Cementerio', 'Instalador', 'Sucursal', ''].map(h => (
                     <th key={h} className="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide whitespace-nowrap bg-slate-50">{h}</th>
                   ))}
                 </tr>
@@ -133,6 +146,15 @@ export default function Servicios() {
                     <td className="px-4 py-3 text-slate-500">{r.cementerio || '-'}</td>
                     <td className="px-4 py-3 text-slate-500">{r.trabajadores?.nombre || '-'}</td>
                     <td className="px-4 py-3 text-slate-500">{r.sucursales?.nombre || '-'}</td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => setPendingDelete(r)}
+                        className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Eliminar servicio"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -142,5 +164,45 @@ export default function Servicios() {
         </div>
       )}
     </div>
+
+    {/* Modal confirmación eliminar servicio */}
+
+    {pendingDelete && (
+      <div className="modal-backdrop">
+        <div className="modal-panel w-full max-w-md">
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900">Eliminar servicio</h3>
+                <p className="text-sm text-slate-500">Esta acción es irreversible</p>
+              </div>
+            </div>
+            <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-5 text-sm text-red-700 space-y-1">
+              <p className="font-semibold">Se eliminará permanentemente:</p>
+              <ul className="list-disc list-inside space-y-0.5 text-red-600">
+                <li>Servicio #{pendingDelete.numero_formulario} — {pendingDelete.nombre_cliente}</li>
+                <li>Registro del fallecido</li>
+                <li>Detalle de venta asociada</li>
+                <li>Forma de pago y cheques</li>
+                <li>El stock de la urna será devuelto</li>
+              </ul>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setPendingDelete(null)} className="btn-secondary flex-1 justify-center">
+                Cancelar
+              </button>
+              <button onClick={eliminarServicio} disabled={eliminando}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-sm transition-colors disabled:opacity-60">
+                {eliminando ? 'Eliminando...' : 'Sí, eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }

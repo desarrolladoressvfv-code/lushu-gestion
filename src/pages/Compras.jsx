@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase, CLIENTE_ID, clp } from '../lib/supabase'
-import { Plus, Trash2, Lock, X } from 'lucide-react'
+import { Plus, Trash2, Lock, X, AlertTriangle } from 'lucide-react'
 import { SkeletonTabla } from '../components/SkeletonLoader'
 import { hoyCL } from '../lib/fecha'
 
@@ -24,6 +24,8 @@ export default function Compras() {
   const [form, setForm] = useState({ proveedor_id: '', sucursal_id: '', fecha: hoyCL(), notas: '' })
   const [items, setItems] = useState([itemVacio()])
   const [alertaId, setAlertaId] = useState(null)
+  const [pendingDelete, setPendingDelete] = useState(null)
+  const [eliminando, setEliminando] = useState(false)
 
   async function cargar() {
     const [{ data: o }, { data: p }, { data: pr }, { data: s }] = await Promise.all([
@@ -90,14 +92,13 @@ export default function Compras() {
     }
   }
 
-  async function cancelarOrden(oc) {
-    if (oc.estado !== 'pendiente') {
-      setAlertaId(oc.id)
-      setTimeout(() => setAlertaId(null), 3000)
-      return
-    }
-    await supabase.from('ordenes_compra').update({ estado: 'cancelada' }).eq('id', oc.id)
-    cargar()
+  async function eliminarOrden() {
+    if (!pendingDelete) return
+    setEliminando(true)
+    const { error } = await supabase.rpc('eliminar_orden_compra', { p_orden_id: pendingDelete.id })
+    setEliminando(false)
+    setPendingDelete(null)
+    if (!error) setOrdenes(prev => prev.filter(o => o.id !== pendingDelete.id))
   }
 
   return (
@@ -138,24 +139,13 @@ export default function Compras() {
                     </td>
                     <td className="px-4 py-3 text-slate-500 max-w-xs truncate">{o.notas || '-'}</td>
                     <td className="px-4 py-3">
-                      {o.estado === 'pendiente' ? (
-                        <button
-                          onClick={() => cancelarOrden(o)}
-                          className="text-xs text-red-600 hover:text-red-800 font-medium border border-red-200 hover:border-red-400 rounded-lg px-2.5 py-1 transition-colors"
-                        >
-                          Cancelar
-                        </button>
-                      ) : o.estado === 'recibida' ? (
-                        <div className="flex items-center gap-1.5">
-                          <Lock className="w-3.5 h-3.5 text-slate-400" />
-                          <span className="text-xs text-slate-400">Recibida</span>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-400">Cancelada</span>
-                      )}
-                      {alertaId === o.id && (
-                        <span className="text-xs text-red-600 font-medium block mt-0.5">No se puede modificar</span>
-                      )}
+                      <button
+                        onClick={() => setPendingDelete(o)}
+                        className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Eliminar orden"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -258,6 +248,43 @@ export default function Compras() {
               <button onClick={guardar} disabled={guardando || !form.proveedor_id} className="btn-primary flex-1 justify-center">
                 {guardando ? 'Guardando...' : 'Guardar Orden'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal confirmación eliminar OC */}
+      {pendingDelete && (
+        <div className="modal-backdrop">
+          <div className="modal-panel w-full max-w-md">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900">Eliminar orden de compra</h3>
+                  <p className="text-sm text-slate-500">Esta acción es irreversible</p>
+                </div>
+              </div>
+              <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-5 text-sm text-red-700 space-y-1">
+                <p className="font-semibold">Se eliminará permanentemente:</p>
+                <ul className="list-disc list-inside space-y-0.5 text-red-600">
+                  <li>La orden de compra y sus productos</li>
+                  {pendingDelete.estado === 'recibida' && (
+                    <li className="font-semibold">⚠ El stock recibido será descontado del inventario</li>
+                  )}
+                </ul>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setPendingDelete(null)} className="btn-secondary flex-1 justify-center">
+                  Cancelar
+                </button>
+                <button onClick={eliminarOrden} disabled={eliminando}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-sm transition-colors disabled:opacity-60">
+                  {eliminando ? 'Eliminando...' : 'Sí, eliminar'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

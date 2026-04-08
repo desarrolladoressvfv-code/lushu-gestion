@@ -23,6 +23,9 @@ import Compras from './pages/Compras'
 import RecepcionMercaderia from './pages/RecepcionMercaderia'
 import Configuracion from './pages/Configuracion'
 import ChatBot from './components/ChatBot'
+import CambiarPassObligatorio from './pages/CambiarPassObligatorio'
+import AccesoDenegado from './pages/AccesoDenegado'
+import bikloudLogo from './assets/bikloud-logo-white.svg'
 
 /* ── S6: Página de upgrade de plan ─────────────────────── */
 function PaginaUpgrade({ modulo }) {
@@ -58,10 +61,11 @@ function PaginaUpgrade({ modulo }) {
 /* ── Pantalla de carga ──────────────────────────────────── */
 function LoadingScreen() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900">
-      <div className="text-center">
-        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-slate-400 text-sm">Cargando...</p>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 gap-8">
+      <img src={bikloudLogo} alt="BiKloud" className="w-64 opacity-90" />
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-slate-400 text-sm">Cargando información...</p>
       </div>
     </div>
   )
@@ -107,6 +111,9 @@ function AppRouter() {
   if (cargando) return <LoadingScreen />
   if (!session)  return <Login />
 
+  /* Sesión válida pero perfil aún no cargado → mostrar loading en vez de AccesoBloqueado */
+  if (!perfil) return <LoadingScreen />
+
   /* Portal superadmin */
   if (esSuperAdmin) {
     return (
@@ -122,13 +129,34 @@ function AppRouter() {
     )
   }
 
-  /* Cliente bloqueado / sin perfil */
-  if (!perfil || !clienteActivo) {
+  /* Cliente bloqueado */
+  if (!clienteActivo) {
     return <AccesoBloqueado logout={logout} razon={perfil?.licenciaRazon} />
   }
 
+  /* Cambio de contraseña obligatorio */
+  if (perfil?.debeCambiarPass) {
+    return <CambiarPassObligatorio />
+  }
+
   /* Portal cliente */
-  const esPro = perfil?.plan === 'profesional' || perfil?.plan === 'enterprise'
+  const esPro      = perfil?.plan === 'profesional' || perfil?.plan === 'enterprise'
+  const esOperador = perfil?.rol === 'operador'
+  const modulos    = perfil?.modulosPermitidos || []
+
+  // Helper: verifica si el operador tiene acceso a un módulo
+  // Admin siempre tiene acceso a todo
+  function puedeAcceder(modulo) {
+    if (!esOperador) return true
+    return modulos.includes(modulo)
+  }
+
+  // Elemento de ruta con control de acceso por módulo
+  function RutaProtegida({ modulo, elemento, soloAdmin = false }) {
+    if (soloAdmin && esOperador) return <AccesoDenegado />
+    if (modulo && !puedeAcceder(modulo)) return <AccesoDenegado />
+    return elemento
+  }
 
   // Determinar si mostrar bienvenida:
   // fase 'bienvenida' explícita (ej: repetir tour desde config)
@@ -171,18 +199,18 @@ function AppRouter() {
           <Routes>
             <Route path="/"              element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard"     element={<Dashboard />} />
-            <Route path="/formulario"    element={<FormularioNuevo />} />
-            <Route path="/cotizacion"    element={esPro ? <Cotizacion />            : <PaginaUpgrade modulo="Cotización" />} />
-            <Route path="/servicios"     element={<Servicios />} />
-            <Route path="/ventas"        element={esPro ? <Ventas />               : <PaginaUpgrade modulo="Ventas" />} />
-            <Route path="/formas-pago"   element={esPro ? <FormasPago />           : <PaginaUpgrade modulo="Formas de Pago" />} />
-            <Route path="/cheques"       element={esPro ? <Cheques />              : <PaginaUpgrade modulo="Cheques" />} />
-            <Route path="/fallecidos"    element={<Fallecidos />} />
-            <Route path="/inventario"    element={<Inventario />} />
-            <Route path="/movimientos"   element={esPro ? <MovimientosInventario /> : <PaginaUpgrade modulo="Movimientos de Inventario" />} />
-            <Route path="/compras"       element={esPro ? <Compras />              : <PaginaUpgrade modulo="Órdenes de Compra" />} />
-            <Route path="/recepcion"     element={esPro ? <RecepcionMercaderia />  : <PaginaUpgrade modulo="Recepción de Mercadería" />} />
-            <Route path="/configuracion" element={<Configuracion />} />
+            <Route path="/formulario"    element={<RutaProtegida modulo="formulario"  elemento={<FormularioNuevo />} />} />
+            <Route path="/cotizacion"    element={<RutaProtegida modulo="cotizacion"  elemento={esPro ? <Cotizacion /> : <PaginaUpgrade modulo="Cotización" />} />} />
+            <Route path="/servicios"     element={<RutaProtegida modulo="servicios"   elemento={<Servicios />} />} />
+            <Route path="/ventas"        element={<RutaProtegida modulo="ventas"      elemento={esPro ? <Ventas /> : <PaginaUpgrade modulo="Ventas" />} soloAdmin />} />
+            <Route path="/formas-pago"   element={<RutaProtegida modulo="formas_pago" elemento={esPro ? <FormasPago /> : <PaginaUpgrade modulo="Formas de Pago" />} />} />
+            <Route path="/cheques"       element={<RutaProtegida modulo="cheques"     elemento={esPro ? <Cheques /> : <PaginaUpgrade modulo="Cheques" />} soloAdmin />} />
+            <Route path="/fallecidos"    element={<RutaProtegida modulo="fallecidos"  elemento={<Fallecidos />} />} />
+            <Route path="/inventario"    element={<RutaProtegida modulo="inventario"  elemento={<Inventario />} />} />
+            <Route path="/movimientos"   element={<RutaProtegida modulo="movimientos" elemento={esPro ? <MovimientosInventario /> : <PaginaUpgrade modulo="Movimientos de Inventario" />} />} />
+            <Route path="/compras"       element={<RutaProtegida modulo="compras"     elemento={esPro ? <Compras /> : <PaginaUpgrade modulo="Órdenes de Compra" />} />} />
+            <Route path="/recepcion"     element={<RutaProtegida modulo="recepcion"   elemento={esPro ? <RecepcionMercaderia /> : <PaginaUpgrade modulo="Recepción de Mercadería" />} />} />
+            <Route path="/configuracion" element={<RutaProtegida soloAdmin           elemento={<Configuracion />} />} />
             <Route path="*"              element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Layout>

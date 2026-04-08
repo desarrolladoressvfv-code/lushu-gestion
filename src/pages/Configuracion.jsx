@@ -48,7 +48,19 @@ import { useAuth } from '../context/AuthContext'
 import { useTour } from '../context/TourContext'
 import { useEmpresa } from '../context/EmpresaContext'
 
-const TABS = ['Mi Empresa', 'Productos', 'Convenios', 'Trabajadores', 'Proveedores', 'Sucursales']
+const TABS = ['Mi Empresa', 'Productos', 'Convenios', 'Trabajadores', 'Proveedores', 'Sucursales', 'Usuarios', 'Auditoría']
+
+const TODOS_MODULOS = [
+  { key: 'formulario',  label: 'Nuevo Servicio' },
+  { key: 'cotizacion',  label: 'Cotización' },
+  { key: 'servicios',   label: 'Servicios' },
+  { key: 'fallecidos',  label: 'Fallecidos' },
+  { key: 'formas_pago', label: 'Formas de Pago' },
+  { key: 'inventario',  label: 'Stock Actual' },
+  { key: 'movimientos', label: 'Movimientos' },
+  { key: 'compras',     label: 'Órdenes de Compra' },
+  { key: 'recepcion',   label: 'Recepción' },
+]
 
 // ─── Tab Mi Empresa ──────────────────────────────────────────────────────────
 function TabEmpresa() {
@@ -668,6 +680,426 @@ function TabSucursales() {
   )
 }
 
+// ─── Tab Usuarios ─────────────────────────────────────────────────────────────
+function TabUsuarios() {
+  const [usuarios, setUsuarios]         = useState([])
+  const [sucursales, setSucursales]     = useState([])
+  const [loading, setLoading]           = useState(true)
+  const [modal, setModal]               = useState(false)
+  const [editando, setEditando]         = useState(null)
+  const [guardando, setGuardando]       = useState(false)
+  const [toast, setToast]               = useState(null)
+  const [form, setForm]                 = useState({
+    nombre: '', email: '', password: '',
+    acceso_tipo: 'general', sucursal_id: '',
+    modulos_permitidos: [],
+  })
+
+  async function cargar() {
+    setLoading(true)
+    const [{ data: u }, { data: s }] = await Promise.all([
+      supabase.rpc('get_usuarios_cliente'),
+      supabase.from('sucursales').select('id,nombre').eq('cliente_id', CLIENTE_ID).eq('activo', true).order('nombre'),
+    ])
+    setUsuarios(u || [])
+    setSucursales(s || [])
+    setLoading(false)
+  }
+
+  useEffect(() => { cargar() }, [])
+
+  function abrirModalNuevo() {
+    setEditando(null)
+    setForm({ nombre: '', email: '', password: '', acceso_tipo: 'general', sucursal_id: '', modulos_permitidos: [] })
+    setModal(true)
+  }
+
+  function abrirModalEditar(u) {
+    setEditando(u)
+    setForm({
+      nombre: u.nombre, email: u.email, password: '',
+      acceso_tipo: u.acceso_tipo || 'general',
+      sucursal_id: u.sucursal_id || '',
+      modulos_permitidos: u.modulos_permitidos || [],
+    })
+    setModal(true)
+  }
+
+  function toggleModulo(key) {
+    setForm(f => ({
+      ...f,
+      modulos_permitidos: f.modulos_permitidos.includes(key)
+        ? f.modulos_permitidos.filter(m => m !== key)
+        : [...f.modulos_permitidos, key],
+    }))
+  }
+
+  async function guardar() {
+    if (!form.nombre.trim()) { setToast({ msg: 'El nombre es obligatorio', tipo: 'error' }); return }
+    if (!editando && (!form.email.trim() || !form.password.trim())) {
+      setToast({ msg: 'Email y contraseña son obligatorios', tipo: 'error' }); return
+    }
+    setGuardando(true)
+    try {
+      if (editando) {
+        // Actualizar datos del operador existente
+        const { error } = await supabase.rpc('actualizar_operador', {
+          p_usuario_id:         editando.id,
+          p_acceso_tipo:        form.acceso_tipo,
+          p_sucursal_id:        form.acceso_tipo === 'sucursal' ? form.sucursal_id || null : null,
+          p_modulos_permitidos: form.modulos_permitidos,
+          p_activo:             editando.activo,
+        })
+        if (error) throw new Error(error.message)
+        setToast({ msg: 'Usuario actualizado', tipo: 'ok' })
+      } else {
+        // Crear nuevo operador via Edge Function
+        const { data: { session } } = await supabase.auth.getSession()
+        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crear-operador`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            nombre:             form.nombre.trim(),
+            email:              form.email.trim(),
+            password:           form.password,
+            acceso_tipo:        form.acceso_tipo,
+            sucursal_id:        form.acceso_tipo === 'sucursal' ? form.sucursal_id || null : null,
+            modulos_permitidos: form.modulos_permitidos,
+          }),
+        })
+        const result = await res.json()
+        if (!result.ok) throw new Error(result.error)
+        setToast({ msg: `Operador ${form.email} creado`, tipo: 'ok' })
+      }
+      setModal(false)
+      cargar()
+    } catch (e) {
+      setToast({ msg: e.message, tipo: 'error' })
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  async function toggleActivo(u) {
+    await supabase.rpc('toggle_usuario', { p_usuario_id: u.id })
+    cargar()
+  }
+
+  async function resetPass(u) {
+    const nueva = prompt(`Nueva contraseña para ${u.nombre} (mín. 6 caracteres):`)
+    if (!nueva || nueva.length < 6) return
+    // Marcar debe_cambiar_pass = true para forzar cambio en próximo login
+    await supabase.from('usuarios').update({ debe_cambiar_pass: true }).eq('id', u.id)
+    setToast({ msg: `Se forzará cambio de contraseña a ${u.nombre}`, tipo: 'ok' })
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate-500">{usuarios.length} usuario{usuarios.length !== 1 ? 's' : ''}</p>
+        <button onClick={abrirModalNuevo} className="btn-primary">
+          <Plus className="w-4 h-4" /> Nuevo Operador
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-10 text-slate-400">Cargando...</div>
+      ) : (
+        <div className="tabla-panel">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-100">
+                <tr>
+                  {['Nombre', 'Email', 'Rol', 'Acceso', 'Sucursal', 'Último acceso', 'Estado', 'Acciones'].map(h => (
+                    <th key={h} className="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {usuarios.length === 0 ? (
+                  <tr><td colSpan={8} className="text-center py-10 text-slate-400">Sin usuarios registrados</td></tr>
+                ) : usuarios.map(u => (
+                  <tr key={u.id} className="tabla-fila">
+                    <td className="px-4 py-3 font-medium text-slate-900">{u.nombre}</td>
+                    <td className="px-4 py-3 text-slate-500">{u.email}</td>
+                    <td className="px-4 py-3">
+                      <span className={`badge ${u.rol === 'admin' ? 'badge-blue' : 'badge-gray'}`}>
+                        {u.rol === 'admin' ? 'Admin' : 'Operador'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-500 capitalize">{u.acceso_tipo || 'general'}</td>
+                    <td className="px-4 py-3 text-slate-500">{u.sucursal_nombre || '—'}</td>
+                    <td className="px-4 py-3 text-slate-400 text-xs">
+                      {u.ultimo_acceso ? new Date(u.ultimo_acceso).toLocaleDateString('es-CL') : 'Nunca'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`badge ${u.activo ? 'badge-green' : 'badge-gray'}`}>
+                        {u.activo ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {u.rol !== 'admin' && (
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => abrirModalEditar(u)}
+                            className="p-1.5 rounded-lg text-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Editar">
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => toggleActivo(u)}
+                            className={`p-1.5 rounded-lg transition-colors ${u.activo ? 'text-amber-400 hover:text-amber-600 hover:bg-amber-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}
+                            title={u.activo ? 'Desactivar' : 'Activar'}>
+                            {u.activo ? <X className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
+                          </button>
+                          <button onClick={() => resetPass(u)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors" title="Forzar cambio de contraseña">
+                            <Building2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Modal crear/editar operador */}
+      {modal && (
+        <div className="modal-backdrop">
+          <div className="modal-panel w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <h3 className="font-bold text-slate-900">{editando ? 'Editar operador' : 'Nuevo operador'}</h3>
+              <button onClick={() => setModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              {/* Datos básicos — solo en creación */}
+              {!editando && (
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <label className="label-base">Nombre completo</label>
+                    <input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
+                      className="input-base" placeholder="Juan Pérez" />
+                  </div>
+                  <div>
+                    <label className="label-base">Email</label>
+                    <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                      className="input-base" placeholder="juan@funeraria.cl" />
+                  </div>
+                  <div>
+                    <label className="label-base">Contraseña temporal</label>
+                    <input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                      className="input-base" placeholder="Mínimo 6 caracteres" />
+                    <p className="text-xs text-slate-400 mt-1">El operador deberá cambiarla en su primer ingreso</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Tipo de acceso */}
+              <div>
+                <label className="label-base">Tipo de acceso</label>
+                <div className="flex gap-3">
+                  {[['general', 'General (todas las sucursales)'], ['sucursal', 'Por sucursal específica']].map(([val, lbl]) => (
+                    <label key={val} className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="acceso_tipo" value={val}
+                        checked={form.acceso_tipo === val}
+                        onChange={() => setForm(f => ({ ...f, acceso_tipo: val }))}
+                        className="accent-blue-600" />
+                      <span className="text-sm text-slate-700">{lbl}</span>
+                    </label>
+                  ))}
+                </div>
+                {form.acceso_tipo === 'sucursal' && (
+                  <select value={form.sucursal_id} onChange={e => setForm(f => ({ ...f, sucursal_id: e.target.value }))}
+                    className="input-base mt-2">
+                    <option value="">Seleccionar sucursal...</option>
+                    {sucursales.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                  </select>
+                )}
+              </div>
+
+              {/* Módulos */}
+              <div>
+                <label className="label-base">Módulos habilitados</label>
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  {TODOS_MODULOS.map(m => (
+                    <label key={m.key} className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-slate-50 border border-slate-100">
+                      <input type="checkbox"
+                        checked={form.modulos_permitidos.includes(m.key)}
+                        onChange={() => toggleModulo(m.key)}
+                        className="accent-blue-600 w-4 h-4" />
+                      <span className="text-sm text-slate-700">{m.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 px-5 pb-5">
+              <button onClick={() => setModal(false)} className="btn-secondary flex-1 justify-center">Cancelar</button>
+              <button onClick={guardar} disabled={guardando} className="btn-primary flex-1 justify-center">
+                {guardando ? 'Guardando...' : editando ? 'Guardar cambios' : 'Crear operador'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && <Toast mensaje={toast.msg} tipo={toast.tipo} onClose={() => setToast(null)} />}
+    </div>
+  )
+}
+
+// ─── Tab Auditoría ────────────────────────────────────────────────────────────
+function TabAuditoria() {
+  const [rows, setRows]           = useState([])
+  const [loading, setLoading]     = useState(true)
+  const [filtroUsuario, setFiltroUsuario] = useState('')
+  const [filtroModulo, setFiltroModulo]   = useState('')
+  const [filtroAccion, setFiltroAccion]   = useState('')
+  const [desde, setDesde]         = useState('')
+  const [hasta, setHasta]         = useState('')
+  const [detalle, setDetalle]     = useState(null)
+
+  useEffect(() => {
+    supabase.from('auditoria').select('*')
+      .eq('cliente_id', CLIENTE_ID)
+      .order('fecha', { ascending: false })
+      .limit(500)
+      .then(({ data }) => { setRows(data || []); setLoading(false) })
+  }, [])
+
+  const filtrados = rows.filter(r => {
+    if (filtroUsuario && !r.nombre_usuario?.toLowerCase().includes(filtroUsuario.toLowerCase())) return false
+    if (filtroModulo && r.modulo !== filtroModulo) return false
+    if (filtroAccion && r.accion !== filtroAccion) return false
+    if (desde && r.fecha < desde) return false
+    if (hasta && r.fecha?.slice(0,10) > hasta) return false
+    return true
+  })
+
+  const modulos  = [...new Set(rows.map(r => r.modulo).filter(Boolean))]
+  const acciones = [...new Set(rows.map(r => r.accion).filter(Boolean))]
+
+  function exportar() {
+    const datos = filtrados.map(r => ({
+      'Fecha':    new Date(r.fecha).toLocaleString('es-CL'),
+      'Usuario':  r.nombre_usuario || '',
+      'Rol':      r.rol || '',
+      'Acción':   r.accion || '',
+      'Módulo':   r.modulo || '',
+      'Descripción': r.descripcion || '',
+    }))
+    import('../lib/exportExcel').then(({ exportarExcel }) => exportarExcel(datos, 'Auditoría', 'Auditoria'))
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Filtros */}
+      <div className="filtros-bar flex flex-wrap gap-3 items-center">
+        <input value={filtroUsuario} onChange={e => setFiltroUsuario(e.target.value)}
+          className="input-base w-40" placeholder="Buscar usuario..." />
+        <select value={filtroModulo} onChange={e => setFiltroModulo(e.target.value)} className="input-base w-36">
+          <option value="">Todos los módulos</option>
+          {modulos.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <select value={filtroAccion} onChange={e => setFiltroAccion(e.target.value)} className="input-base w-32">
+          <option value="">Todas las acciones</option>
+          {acciones.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
+        <input type="date" value={desde} onChange={e => setDesde(e.target.value)} className="input-base w-36" title="Desde" />
+        <input type="date" value={hasta} onChange={e => setHasta(e.target.value)} className="input-base w-36" title="Hasta" />
+        <button onClick={exportar} className="btn-excel ml-auto">
+          <Plus className="w-4 h-4" /> Excel
+        </button>
+      </div>
+
+      {loading ? <div className="text-center py-10 text-slate-400">Cargando...</div> : (
+        <div className="tabla-panel">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-100">
+                <tr>
+                  {['Fecha', 'Usuario', 'Rol', 'Acción', 'Módulo', 'Descripción', ''].map(h => (
+                    <th key={h} className="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {filtrados.length === 0 ? (
+                  <tr><td colSpan={7} className="text-center py-10 text-slate-400">Sin registros</td></tr>
+                ) : filtrados.map(r => (
+                  <tr key={r.id} className="tabla-fila">
+                    <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
+                      {new Date(r.fecha).toLocaleString('es-CL')}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-slate-900">{r.nombre_usuario || '—'}</td>
+                    <td className="px-4 py-3">
+                      <span className={`badge ${r.rol === 'admin' ? 'badge-blue' : 'badge-gray'}`}>{r.rol || '—'}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`badge ${
+                        r.accion === 'crear' ? 'badge-green' :
+                        r.accion === 'eliminar' ? 'badge-red' :
+                        r.accion === 'editar' ? 'badge-amber' : 'badge-gray'
+                      }`}>{r.accion}</span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-500 capitalize">{r.modulo}</td>
+                    <td className="px-4 py-3 text-slate-600 max-w-xs truncate">{r.descripcion}</td>
+                    <td className="px-4 py-3">
+                      {(r.datos_anteriores || r.datos_nuevos) && (
+                        <button onClick={() => setDetalle(r)}
+                          className="text-xs text-blue-600 hover:underline">Ver detalle</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Modal detalle */}
+      {detalle && (
+        <div className="modal-backdrop">
+          <div className="modal-panel w-full max-w-xl max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <h3 className="font-bold text-slate-900">Detalle del cambio</h3>
+              <button onClick={() => setDetalle(null)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              {detalle.datos_anteriores && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Antes</p>
+                  <pre className="bg-red-50 border border-red-100 rounded-xl p-3 text-xs text-red-700 overflow-x-auto">
+                    {JSON.stringify(detalle.datos_anteriores, null, 2)}
+                  </pre>
+                </div>
+              )}
+              {detalle.datos_nuevos && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Después</p>
+                  <pre className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-xs text-emerald-700 overflow-x-auto">
+                    {JSON.stringify(detalle.datos_nuevos, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Página principal ─────────────────────────────────────────────────────────
 export default function Configuracion() {
   const [tab, setTab] = useState(0)
@@ -712,6 +1144,8 @@ export default function Configuracion() {
       {tab === 3 && <TabTrabajadores />}
       {tab === 4 && <TabProveedores />}
       {tab === 5 && <TabSucursales />}
+      {tab === 6 && <TabUsuarios />}
+      {tab === 7 && <TabAuditoria />}
     </div>
   )
 }

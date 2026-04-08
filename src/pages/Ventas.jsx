@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase, CLIENTE_ID, clp } from '../lib/supabase'
-import { Search, Download, TrendingUp, Award, BarChart2 } from 'lucide-react'
+import { Search, Download, TrendingUp, Award, BarChart2, Building2 } from 'lucide-react'
 import { exportarExcel } from '../lib/exportExcel'
 import { SkeletonTabla } from '../components/SkeletonLoader'
 
@@ -10,14 +10,22 @@ export default function Ventas() {
   const [desde, setDesde] = useState('')
   const [hasta, setHasta] = useState('')
   const [busqueda, setBusqueda] = useState('')
+  const [sucursales, setSucursales] = useState([])
+  const [sucursalFiltro, setSucursalFiltro] = useState('')
+
+  useEffect(() => {
+    supabase.from('sucursales').select('id,nombre').eq('cliente_id', CLIENTE_ID).eq('activo', true).order('nombre')
+      .then(({ data }) => setSucursales(data || []))
+  }, [])
 
   useEffect(() => {
     let q = supabase.from('ventas').select('*, productos(nombre), sucursales(nombre)')
       .eq('cliente_id', CLIENTE_ID).order('fecha_servicio', { ascending: false })
     if (desde) q = q.gte('fecha_servicio', desde)
     if (hasta) q = q.lte('fecha_servicio', hasta)
+    if (sucursalFiltro) q = q.eq('sucursal_id', sucursalFiltro)
     q.then(({ data }) => { setRows(data || []); setLoading(false) })
-  }, [desde, hasta])
+  }, [desde, hasta, sucursalFiltro])
 
   const filtrados = rows.filter(r =>
     String(r.numero_formulario).includes(busqueda) ||
@@ -70,7 +78,30 @@ export default function Ventas() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-slate-900">Ventas</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          {sucursales.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-slate-400 flex-shrink-0" />
+              <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
+                <button
+                  onClick={() => setSucursalFiltro('')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 whitespace-nowrap ${
+                    !sucursalFiltro ? 'bg-white shadow text-blue-600 font-semibold' : 'text-slate-500 hover:text-slate-700'
+                  }`}>
+                  General
+                </button>
+                {sucursales.map(s => (
+                  <button key={s.id}
+                    onClick={() => setSucursalFiltro(s.id)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 whitespace-nowrap ${
+                      sucursalFiltro === s.id ? 'bg-white shadow text-blue-600 font-semibold' : 'text-slate-500 hover:text-slate-700'
+                    }`}>
+                    {s.nombre}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <span className="text-sm text-slate-500">{filtrados.length} registros</span>
           <button onClick={exportar} className="btn-excel">
             <Download className="w-4 h-4" /> Excel
@@ -135,19 +166,20 @@ export default function Ventas() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
-                  {['N° Form.', 'Fecha', 'Urna', 'Valor Servicio', 'Val. Adicional', 'Total', 'Descuento', 'Venta Neta', 'IVA', 'Venta Total'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  {['N° Form.', 'Fecha', 'Urna', 'Sucursal', 'Valor Servicio', 'Val. Adicional', 'Total', 'Descuento', 'Venta Neta', 'IVA', 'Venta Total'].map(h => (
+                    <th key={h} className={`px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide whitespace-nowrap ${['Valor Servicio','Val. Adicional','Total','Descuento','Venta Neta','IVA','Venta Total'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {filtrados.length === 0 ? (
-                  <tr><td colSpan={10} className="text-center py-10 text-slate-400">Sin registros</td></tr>
+                  <tr><td colSpan={11} className="text-center py-10 text-slate-400">Sin registros</td></tr>
                 ) : filtrados.map(r => (
                   <tr key={r.id} className="tabla-fila">
                     <td className="px-4 py-3 font-mono font-bold text-blue-600">#{r.numero_formulario}</td>
                     <td className="px-4 py-3 text-slate-600">{r.fecha_servicio}</td>
                     <td className="px-4 py-3 text-slate-700">{r.productos?.nombre || '-'}</td>
+                    <td className="px-4 py-3 text-slate-500">{r.sucursales?.nombre || '-'}</td>
                     <td className="px-4 py-3 text-right text-money">{clp(r.valor_servicio)}</td>
                     <td className="px-4 py-3 text-right text-money">{clp(r.valor_adicional)}</td>
                     <td className="px-4 py-3 text-right text-money">{clp(r.total)}</td>

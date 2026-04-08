@@ -79,6 +79,8 @@ export default function Dashboard() {
   const [stockBajoItems, setStockBajoItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadingGraf, setLoadingGraf] = useState(false)
+  const [grafDesde, setGrafDesde] = useState('')
+  const [grafHasta, setGrafHasta] = useState('')
 
   // Carga sucursales una sola vez
   useEffect(() => {
@@ -177,16 +179,20 @@ export default function Dashboard() {
 
   useEffect(() => { cargar(sucursalFiltro) }, [sucursalFiltro])
 
-  // Recarga gráfico de ventas al cambiar período
+  // Recarga gráfico de ventas al cambiar período o rango de fechas
   useEffect(() => {
     if (loading) return
     setLoadingGraf(true)
     const hace12mGraf = haceNmesesCL(12)
-    const q = sucursalFiltro
-      ? supabase.from('ventas').select('venta_total, fecha_servicio').eq('cliente_id', CLIENTE_ID).eq('sucursal_id', sucursalFiltro).gte('fecha_servicio', hace12mGraf)
-      : supabase.from('ventas').select('venta_total, fecha_servicio').eq('cliente_id', CLIENTE_ID).gte('fecha_servicio', hace12mGraf)
+    let q = supabase.from('ventas').select('venta_total, fecha_servicio')
+      .eq('cliente_id', CLIENTE_ID)
+    if (sucursalFiltro) q = q.eq('sucursal_id', sucursalFiltro)
+    // Si hay rango manual lo usa; si no, últimos 12 meses
+    if (grafDesde) q = q.gte('fecha_servicio', grafDesde)
+    else q = q.gte('fecha_servicio', hace12mGraf)
+    if (grafHasta) q = q.lte('fecha_servicio', grafHasta)
     q.then(({ data }) => { setVentasData(agruparVentas(data || [], periodo)); setLoadingGraf(false) })
-  }, [periodo])
+  }, [periodo, grafDesde, grafHasta])
 
   const formatKpiValue = (cfg) => {
     if (!kpis) return '—'
@@ -258,22 +264,39 @@ export default function Dashboard() {
 
       {/* Gráfico de ventas */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-          <div>
-            <h2 className="font-bold text-slate-800">Evolución de Ventas</h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {sucursalFiltro ? `Sucursal: ${nombreSucursalActual}` : 'Todas las sucursales'}
-            </p>
+        <div className="flex flex-col gap-3 mb-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="font-bold text-slate-800">Evolución de Ventas</h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {sucursalFiltro ? `Sucursal: ${nombreSucursalActual}` : 'Todas las sucursales'}
+              </p>
+            </div>
+            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl self-start sm:self-auto">
+              {PERIODOS.map(p => (
+                <button key={p} onClick={() => setPeriodo(p)}
+                  className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
+                    periodo === p ? 'bg-white shadow text-blue-600 font-semibold' : 'text-slate-500 hover:text-slate-700'
+                  }`}>
+                  {p}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex gap-1 bg-slate-100 p-1 rounded-xl self-start sm:self-auto">
-            {PERIODOS.map(p => (
-              <button key={p} onClick={() => setPeriodo(p)}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
-                  periodo === p ? 'bg-white shadow text-blue-600 font-semibold' : 'text-slate-500 hover:text-slate-700'
-                }`}>
-                {p}
+          {/* Filtro por rango de fechas */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-500 font-medium">Rango:</span>
+            <input type="date" value={grafDesde} onChange={e => setGrafDesde(e.target.value)}
+              className="input-base text-xs py-1.5 w-36" title="Desde" />
+            <span className="text-xs text-slate-400">—</span>
+            <input type="date" value={grafHasta} onChange={e => setGrafHasta(e.target.value)}
+              className="input-base text-xs py-1.5 w-36" title="Hasta" />
+            {(grafDesde || grafHasta) && (
+              <button onClick={() => { setGrafDesde(''); setGrafHasta('') }}
+                className="text-xs text-slate-400 hover:text-slate-600 underline transition-colors">
+                Limpiar
               </button>
-            ))}
+            )}
           </div>
         </div>
         {loading || loadingGraf ? <div className="skeleton h-52 rounded-xl" /> :

@@ -160,8 +160,11 @@ export default function Sidebar({ onClose }) {
   const location = useLocation()
   const [modalPass, setModalPass] = useState(false)
 
-  const plan = perfil?.plan || 'basico'
-  const esPro = plan === 'profesional' || plan === 'enterprise'
+  const plan       = perfil?.plan || 'basico'
+  const esPro      = plan === 'profesional' || plan === 'enterprise'
+  const esOperador = perfil?.rol === 'operador'
+  const modulos    = perfil?.modulosPermitidos || []
+  const puede      = (m) => !esOperador || modulos.includes(m)
 
   const PLAN_BADGE = { basico: { label: 'Básico', color: 'bg-slate-600 text-slate-300' }, profesional: { label: 'Profesional', color: 'bg-blue-600 text-blue-100' }, enterprise: { label: 'Enterprise', color: 'bg-violet-600 text-violet-100' } }
   const planInfo = PLAN_BADGE[plan] || PLAN_BADGE.basico
@@ -203,39 +206,56 @@ export default function Sidebar({ onClose }) {
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-5 scrollbar-thin">
         <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" onClick={onClose} tourId="nav-dashboard" />
 
-        <NavGroup label="Servicios">
-          <NavItem to="/formulario" icon={FilePlus}     label="Nuevo Servicio" onClick={onClose} tourId="nav-formulario" />
-          {esPro && <NavItem to="/cotizacion" icon={FileText} label="Cotización" onClick={onClose} tourId="nav-cotizacion" />}
-          <NavItem to="/servicios" icon={ClipboardList} label="Servicios"      onClick={onClose} tourId="nav-servicios"  />
-          <NavItem to="/fallecidos" icon={Users}        label="Fallecidos"     onClick={onClose} tourId="nav-fallecidos" />
-        </NavGroup>
+        {/* Registros — solo si tiene al menos uno */}
+        {(puede('formulario') || (esPro && puede('cotizacion'))) && (
+          <NavGroup label="Registros">
+            {puede('formulario') && <NavItem to="/formulario" icon={FilePlus} label="Nuevo Servicio" onClick={onClose} tourId="nav-formulario" />}
+            {esPro && puede('cotizacion') && <NavItem to="/cotizacion" icon={FileText} label="Cotización" onClick={onClose} tourId="nav-cotizacion" />}
+          </NavGroup>
+        )}
 
-        {esPro && (
+        {/* Servicios */}
+        {(puede('servicios') || puede('fallecidos')) && (
+          <NavGroup label="Servicios">
+            {puede('servicios') && <NavItem to="/servicios" icon={ClipboardList} label="Servicios" onClick={onClose} tourId="nav-servicios" />}
+            {puede('fallecidos') && <NavItem to="/fallecidos" icon={Users} label="Fallecidos" onClick={onClose} tourId="nav-fallecidos" />}
+          </NavGroup>
+        )}
+
+        {/* Finanzas — Ventas y Cheques solo admin */}
+        {esPro && (!esOperador || puede('formas_pago')) && (
           <NavGroup label="Finanzas">
-            <NavItem to="/ventas"      icon={DollarSign}  label="Ventas"          onClick={onClose} tourId="nav-ventas"      />
-            <NavItem to="/formas-pago" icon={CreditCard}  label="Formas de Pago"
-              badge={alertas.pagoPendiente} badgeColor="bg-amber-500" onClick={onClose} tourId="nav-formas-pago" />
-            <NavItem to="/cheques"     icon={CheckSquare} label="Cheques"
-              badge={alertas.cheques} badgeColor="bg-red-500" onClick={onClose} tourId="nav-cheques" />
+            {!esOperador && <NavItem to="/ventas" icon={DollarSign} label="Ventas" onClick={onClose} tourId="nav-ventas" />}
+            {puede('formas_pago') && <NavItem to="/formas-pago" icon={CreditCard} label="Formas de Pago"
+              badge={alertas.pagoPendiente} badgeColor="bg-amber-500" onClick={onClose} tourId="nav-formas-pago" />}
+            {!esOperador && <NavItem to="/cheques" icon={CheckSquare} label="Cheques"
+              badge={alertas.cheques} badgeColor="bg-red-500" onClick={onClose} tourId="nav-cheques" />}
           </NavGroup>
         )}
 
-        <NavGroup label="Inventario">
-          <NavItem to="/inventario" icon={Package} label="Stock Actual"
-            badge={alertas.stockBajo} badgeColor="bg-orange-500" onClick={onClose} tourId="nav-inventario" />
-          {esPro && <NavItem to="/movimientos" icon={ArrowLeftRight} label="Movimientos" onClick={onClose} tourId="nav-movimientos" />}
-        </NavGroup>
+        {/* Inventario */}
+        {(puede('inventario') || (esPro && puede('movimientos'))) && (
+          <NavGroup label="Inventario">
+            {puede('inventario') && <NavItem to="/inventario" icon={Package} label="Stock Actual"
+              badge={alertas.stockBajo} badgeColor="bg-orange-500" onClick={onClose} tourId="nav-inventario" />}
+            {esPro && puede('movimientos') && <NavItem to="/movimientos" icon={ArrowLeftRight} label="Movimientos" onClick={onClose} tourId="nav-movimientos" />}
+          </NavGroup>
+        )}
 
-        {esPro && (
+        {/* Compras */}
+        {esPro && (puede('compras') || puede('recepcion')) && (
           <NavGroup label="Compras">
-            <NavItem to="/compras"    icon={ShoppingCart} label="Órdenes de Compra" onClick={onClose} tourId="nav-compras"   />
-            <NavItem to="/recepcion"  icon={Truck}        label="Recepción"         onClick={onClose} />
+            {puede('compras') && <NavItem to="/compras" icon={ShoppingCart} label="Órdenes de Compra" onClick={onClose} tourId="nav-compras" />}
+            {puede('recepcion') && <NavItem to="/recepcion" icon={Truck} label="Recepción" onClick={onClose} />}
           </NavGroup>
         )}
 
-        <NavGroup label="Sistema">
-          <NavItem to="/configuracion" icon={Settings} label="Configuración" onClick={onClose} />
-        </NavGroup>
+        {/* Configuración — solo admin */}
+        {!esOperador && (
+          <NavGroup label="Sistema">
+            <NavItem to="/configuracion" icon={Settings} label="Configuración" onClick={onClose} />
+          </NavGroup>
+        )}
       </nav>
 
       {/* Footer */}
