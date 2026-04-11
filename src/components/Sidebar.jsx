@@ -169,12 +169,10 @@ export default function Sidebar({ onClose }) {
   const puede      = (m) => !esOperador || modulos.includes(m)
 
   // ── Alerta de próximo pago ─────────────────────────────
-  const dismissKey = `alerta_pago_${new Date().toISOString().split('T')[0]}`
-  const [diasPago,        setDiasPago]        = useState(null)
-  const [alertaPago,      setAlertaPago]      = useState(false)
-  const [alertaDismissed, setAlertaDismissed] = useState(
-    () => sessionStorage.getItem(dismissKey) === 'true'
-  )
+  const [diasPago,          setDiasPago]          = useState(null)
+  const [alertaPago,        setAlertaPago]        = useState(false)
+  const [modalPagoVisible,  setModalPagoVisible]  = useState(false)
+  const [alertaDismissed,   setAlertaDismissed]   = useState(false)
 
   useEffect(() => {
     if (esOperador || !perfil?.clienteVencimiento) return
@@ -183,13 +181,13 @@ export default function Sidebar({ onClose }) {
     hoy.setHours(0, 0, 0, 0)
     const diff = Math.ceil((venc - hoy) / (1000 * 60 * 60 * 24))
     setDiasPago(diff)
-    if (diff <= 5) setAlertaPago(true)
+    if (diff <= 5) {
+      setAlertaPago(true)
+      setModalPagoVisible(true)
+    }
   }, [perfil?.clienteVencimiento, esOperador])
 
-  function dismissAlertaPago() {
-    sessionStorage.setItem(dismissKey, 'true')
-    setAlertaDismissed(true)
-  }
+  function dismissAlertaPago() { setAlertaDismissed(true) }
 
   const PLAN_BADGE = { basico: { label: 'Básico', color: 'bg-slate-600 text-slate-300' }, profesional: { label: 'Profesional', color: 'bg-blue-600 text-blue-100' }, enterprise: { label: 'Enterprise', color: 'bg-violet-600 text-violet-100' } }
   const planInfo = PLAN_BADGE[plan] || PLAN_BADGE.basico
@@ -314,32 +312,73 @@ export default function Sidebar({ onClose }) {
         />
       )}
 
-      {/* ── Notificación próximo pago ── */}
-      {alertaPago && !alertaDismissed && diasPago !== null && (
+      {/* ── Notificación próximo pago (sidebar, solo tras cerrar modal) ── */}
+      {alertaPago && !alertaDismissed && !modalPagoVisible && diasPago !== null && (
         <div className="fixed bottom-6 right-6 z-[110] w-80 animate-modal">
           <div className={`rounded-2xl shadow-2xl border p-4
-            ${diasPago === 0
-              ? 'bg-red-50 border-red-200'
-              : 'bg-amber-50 border-amber-200'}`}>
+            ${diasPago <= 0 ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
             <div className="flex items-start gap-3">
               <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0
-                ${diasPago === 0 ? 'bg-red-100' : 'bg-amber-100'}`}>
-                <AlertTriangle className={`w-4 h-4 ${diasPago === 0 ? 'text-red-600' : 'text-amber-600'}`} />
+                ${diasPago <= 0 ? 'bg-red-100' : 'bg-amber-100'}`}>
+                <AlertTriangle className={`w-4 h-4 ${diasPago <= 0 ? 'text-red-600' : 'text-amber-600'}`} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className={`font-bold text-sm ${diasPago === 0 ? 'text-red-900' : 'text-amber-900'}`}>
-                  {diasPago === 0 ? '¡El pago vence hoy!' : `Pago en ${diasPago} día${diasPago !== 1 ? 's' : ''}`}
+                <p className={`font-bold text-sm ${diasPago <= 0 ? 'text-red-900' : 'text-amber-900'}`}>
+                  {diasPago <= 0 ? '¡El pago vence hoy!' : `Pago en ${diasPago} día${diasPago !== 1 ? 's' : ''}`}
                 </p>
-                <p className={`text-xs mt-0.5 leading-relaxed ${diasPago === 0 ? 'text-red-700' : 'text-amber-700'}`}>
-                  Tu suscripción mensual está próxima a vencer. Realiza el pago para evitar interrupciones en el servicio.
+                <p className={`text-xs mt-0.5 leading-relaxed ${diasPago <= 0 ? 'text-red-700' : 'text-amber-700'}`}>
+                  Tu suscripción mensual está próxima a vencer. Realiza el pago para evitar interrupciones.
                 </p>
               </div>
               <button onClick={dismissAlertaPago}
                 className={`p-1 rounded-lg flex-shrink-0 transition-colors
-                  ${diasPago === 0 ? 'hover:bg-red-100 text-red-400' : 'hover:bg-amber-100 text-amber-500'}`}>
+                  ${diasPago <= 0 ? 'hover:bg-red-100 text-red-400' : 'hover:bg-amber-100 text-amber-500'}`}>
                 <X className="w-4 h-4" />
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal bloqueante de pago (aparece en cada inicio de sesión) ── */}
+      {modalPagoVisible && diasPago !== null && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center p-6"
+          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}>
+          <div className={`w-full max-w-md rounded-3xl shadow-2xl p-8 text-center animate-modal
+            ${diasPago <= 0 ? 'bg-white border-2 border-red-200' : 'bg-white border-2 border-amber-200'}`}>
+
+            {/* Ícono */}
+            <div className={`w-20 h-20 rounded-full mx-auto flex items-center justify-center mb-6
+              ${diasPago <= 0 ? 'bg-red-100' : 'bg-amber-100'}`}>
+              <AlertTriangle className={`w-10 h-10 ${diasPago <= 0 ? 'text-red-600' : 'text-amber-500'}`} />
+            </div>
+
+            {/* Título */}
+            <h2 className={`text-2xl font-black mb-2 ${diasPago <= 0 ? 'text-red-700' : 'text-amber-700'}`}>
+              {diasPago <= 0
+                ? '¡Tu suscripción vence hoy!'
+                : diasPago === 1
+                  ? '¡Tu suscripción vence mañana!'
+                  : `Tu suscripción vence en ${diasPago} días`}
+            </h2>
+
+            {/* Descripción */}
+            <p className="text-slate-600 text-sm leading-relaxed mb-2">
+              Para evitar la interrupción del servicio, contacta a tu ejecutivo BiKloud y realiza el pago de tu suscripción mensual.
+            </p>
+            <p className={`text-xs font-semibold mb-8 ${diasPago <= 0 ? 'text-red-500' : 'text-amber-500'}`}>
+              Fecha de vencimiento: {new Date(perfil.clienteVencimiento + 'T00:00:00').toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </p>
+
+            {/* Botón continuar */}
+            <button
+              onClick={() => setModalPagoVisible(false)}
+              className={`w-full py-3.5 rounded-2xl font-bold text-white text-base transition-all active:scale-95
+                ${diasPago <= 0
+                  ? 'bg-red-600 hover:bg-red-500 shadow-lg shadow-red-500/30'
+                  : 'bg-amber-500 hover:bg-amber-400 shadow-lg shadow-amber-400/30'}`}>
+              Entendido, continuar al sistema
+            </button>
           </div>
         </div>
       )}
