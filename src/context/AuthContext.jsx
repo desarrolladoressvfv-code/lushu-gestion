@@ -35,7 +35,7 @@ export function AuthProvider({ children }) {
         setSesionDesplazada(true)
         await supabase.auth.signOut()
       }
-    }, 30000)
+    }, 15000)
   }
 
   useEffect(() => {
