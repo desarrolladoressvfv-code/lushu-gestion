@@ -101,7 +101,7 @@ function buildSteps(esPro) {
       title: '📋 Nuevo Servicio',
       desc: 'Registra cada servicio funerario: datos del fallecido, convenio, urna, formas de pago (efectivo, tarjeta, cuotas o cheque) con formato de miles automático e IVA configurable.',
     },
-    esPro && {
+    {
       id: 'nav-cotizacion',
       title: '📄 Cotización',
       desc: 'Genera cotizaciones profesionales en PDF para tus clientes con todos los detalles del servicio y precios.',
@@ -116,17 +116,17 @@ function buildSteps(esPro) {
       title: '📁 Fallecidos',
       desc: 'Registro centralizado de fallecidos asociado a cada servicio. Acceso rápido a ficha completa.',
     },
-    esPro && {
+    {
       id: 'nav-ventas',
       title: '💰 Ventas',
       desc: 'Resumen financiero de todas tus ventas. Filtros por período, convenio y estado de pago.',
     },
-    esPro && {
+    {
       id: 'nav-formas-pago',
       title: '💳 Formas de Pago',
       desc: 'Controla cómo te están pagando tus clientes. Alertas automáticas de pagos pendientes.',
     },
-    esPro && {
+    {
       id: 'nav-cheques',
       title: '🔖 Cuentas por cobrar',
       desc: 'Gestiona cheques y cuotas en un solo lugar. Cada cuota se registra de forma individual para hacer seguimiento por cuota: pendiente, vencida o cobrada. Alertas antes del vencimiento.',
@@ -136,12 +136,12 @@ function buildSteps(esPro) {
       title: '📦 Stock Actual',
       desc: 'Controla tu inventario por sucursal en tiempo real. Alertas cuando el stock cae bajo el mínimo.',
     },
-    esPro && {
+    {
       id: 'nav-movimientos',
       title: '↔️ Movimientos',
       desc: 'Historial completo de entradas y salidas de inventario. Trazabilidad total de cada producto.',
     },
-    esPro && {
+    {
       id: 'nav-compras',
       title: '🛒 Órdenes de Compra',
       desc: 'Gestiona tus compras a proveedores. Crea órdenes, recibe mercadería y controla costos.',

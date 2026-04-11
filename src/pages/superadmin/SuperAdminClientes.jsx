@@ -10,7 +10,7 @@ const supabaseAux = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
-const MAX_SUCURSALES_DEFAULT = { basico: 1, profesional: 3, enterprise: 99 }
+const MAX_SUCURSALES_DEFAULT = { basico: 1, profesional: 3, enterprise: 9999 }
 const VALOR_DEFAULT          = { basico: 29, profesional: 79, enterprise: 149 }
 
 const formVacio = () => ({

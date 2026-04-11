@@ -238,11 +238,11 @@ export default function Sidebar({ onClose }) {
           <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" onClick={onClose} tourId="nav-dashboard" />
         )}
 
-        {/* Registros — solo si tiene al menos uno */}
-        {(puede('formulario') || (esPro && puede('cotizacion'))) && (
+        {/* Registros */}
+        {(puede('formulario') || puede('cotizacion')) && (
           <NavGroup label="Registros">
             {puede('formulario') && <NavItem to="/formulario" icon={FilePlus} label="Nuevo Servicio" onClick={onClose} tourId="nav-formulario" />}
-            {esPro && puede('cotizacion') && <NavItem to="/cotizacion" icon={FileText} label="Cotización" onClick={onClose} tourId="nav-cotizacion" />}
+            {puede('cotizacion') && <NavItem to="/cotizacion" icon={FileText} label="Cotización" onClick={onClose} tourId="nav-cotizacion" />}
           </NavGroup>
         )}
 
@@ -254,8 +254,8 @@ export default function Sidebar({ onClose }) {
           </NavGroup>
         )}
 
-        {/* Finanzas — Ventas y Cheques solo admin */}
-        {esPro && (!esOperador || puede('formas_pago')) && (
+        {/* Finanzas */}
+        {(!esOperador || puede('formas_pago')) && (
           <NavGroup label="Finanzas">
             {!esOperador && <NavItem to="/ventas" icon={DollarSign} label="Ventas" onClick={onClose} tourId="nav-ventas" />}
             {puede('formas_pago') && <NavItem to="/formas-pago" icon={CreditCard} label="Formas de Pago"
@@ -266,16 +266,16 @@ export default function Sidebar({ onClose }) {
         )}
 
         {/* Inventario */}
-        {(puede('inventario') || (esPro && puede('movimientos'))) && (
+        {(puede('inventario') || puede('movimientos')) && (
           <NavGroup label="Inventario">
             {puede('inventario') && <NavItem to="/inventario" icon={Package} label="Stock Actual"
               badge={alertas.stockBajo} badgeColor="bg-orange-500" onClick={onClose} tourId="nav-inventario" />}
-            {esPro && puede('movimientos') && <NavItem to="/movimientos" icon={ArrowLeftRight} label="Movimientos" onClick={onClose} tourId="nav-movimientos" />}
+            {puede('movimientos') && <NavItem to="/movimientos" icon={ArrowLeftRight} label="Movimientos" onClick={onClose} tourId="nav-movimientos" />}
           </NavGroup>
         )}
 
         {/* Compras */}
-        {esPro && (puede('compras') || puede('recepcion')) && (
+        {(puede('compras') || puede('recepcion')) && (
           <NavGroup label="Compras">
             {puede('compras') && <NavItem to="/compras" icon={ShoppingCart} label="Órdenes de Compra" onClick={onClose} tourId="nav-compras" />}
             {puede('recepcion') && <NavItem to="/recepcion" icon={Truck} label="Recepción" onClick={onClose} />}

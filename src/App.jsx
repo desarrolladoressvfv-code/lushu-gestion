@@ -216,16 +216,16 @@ function AppRouter() {
             <Route path="/dashboard"     element={<RutaProtegida {...rp} modulo="dashboard" elemento={<Dashboard />} />} />
             <Route path="/formulario"          element={<RutaProtegida {...rp} modulo="formulario" elemento={<FormularioNuevo />} />} />
             <Route path="/formulario/editar/:id" element={<RutaProtegida {...rp} modulo="formulario" elemento={<FormularioEditar />} />} />
-            <Route path="/cotizacion"    element={<RutaProtegida {...rp} modulo="cotizacion"  elemento={esPro ? <Cotizacion /> : <PaginaUpgrade modulo="Cotización" />} />} />
+            <Route path="/cotizacion"    element={<RutaProtegida {...rp} modulo="cotizacion"  elemento={<Cotizacion />} />} />
             <Route path="/servicios"     element={<RutaProtegida {...rp} modulo="servicios"   elemento={<Servicios />} />} />
-            <Route path="/ventas"        element={<RutaProtegida {...rp} modulo="ventas"      elemento={esPro ? <Ventas /> : <PaginaUpgrade modulo="Ventas" />} soloAdmin />} />
-            <Route path="/formas-pago"   element={<RutaProtegida {...rp} modulo="formas_pago" elemento={esPro ? <FormasPago /> : <PaginaUpgrade modulo="Formas de Pago" />} />} />
-            <Route path="/cheques"       element={<RutaProtegida {...rp} modulo="cheques"     elemento={esPro ? <Cheques /> : <PaginaUpgrade modulo="Cheques" />} soloAdmin />} />
+            <Route path="/ventas"        element={<RutaProtegida {...rp} modulo="ventas"      elemento={<Ventas />} soloAdmin />} />
+            <Route path="/formas-pago"   element={<RutaProtegida {...rp} modulo="formas_pago" elemento={<FormasPago />} />} />
+            <Route path="/cheques"       element={<RutaProtegida {...rp} modulo="cheques"     elemento={<Cheques />} soloAdmin />} />
             <Route path="/fallecidos"    element={<RutaProtegida {...rp} modulo="fallecidos"  elemento={<Fallecidos />} />} />
             <Route path="/inventario"    element={<RutaProtegida {...rp} modulo="inventario"  elemento={<Inventario />} />} />
-            <Route path="/movimientos"   element={<RutaProtegida {...rp} modulo="movimientos" elemento={esPro ? <MovimientosInventario /> : <PaginaUpgrade modulo="Movimientos de Inventario" />} />} />
-            <Route path="/compras"       element={<RutaProtegida {...rp} modulo="compras"     elemento={esPro ? <Compras /> : <PaginaUpgrade modulo="Órdenes de Compra" />} />} />
-            <Route path="/recepcion"     element={<RutaProtegida {...rp} modulo="recepcion"   elemento={esPro ? <RecepcionMercaderia /> : <PaginaUpgrade modulo="Recepción de Mercadería" />} />} />
+            <Route path="/movimientos"   element={<RutaProtegida {...rp} modulo="movimientos" elemento={<MovimientosInventario />} />} />
+            <Route path="/compras"       element={<RutaProtegida {...rp} modulo="compras"     elemento={<Compras />} />} />
+            <Route path="/recepcion"     element={<RutaProtegida {...rp} modulo="recepcion"   elemento={<RecepcionMercaderia />} />} />
             <Route path="/configuracion" element={<RutaProtegida {...rp} soloAdmin           elemento={<Configuracion />} />} />
             <Route path="*"              element={<Navigate to="/dashboard" replace />} />
           </Routes>
