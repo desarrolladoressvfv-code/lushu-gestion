@@ -18,8 +18,15 @@ export function AuthProvider({ children }) {
   function iniciarCheck(userId) {
     detenerCheck()
     checkRef.current = setInterval(async () => {
-      const miToken = localStorage.getItem(SESSION_KEY)
-      if (!miToken) return
+      let miToken = localStorage.getItem(SESSION_KEY)
+      if (!miToken) {
+        // Sin token local → reclamar sesión (genera token y guarda en DB)
+        miToken = crypto.randomUUID()
+        localStorage.setItem(SESSION_KEY, miToken)
+        await supabase.from('usuarios').update({ session_token: miToken }).eq('auth_user_id', userId)
+        return
+      }
+      // Verificar que el token local sigue siendo el vigente en DB
       const { data } = await supabase.from('usuarios')
         .select('session_token').eq('auth_user_id', userId).single()
       if (data?.session_token && data.session_token !== miToken) {
@@ -28,7 +35,7 @@ export function AuthProvider({ children }) {
         setSesionDesplazada(true)
         await supabase.auth.signOut()
       }
-    }, 30000) // verifica cada 30 segundos
+    }, 30000)
   }
 
   useEffect(() => {
