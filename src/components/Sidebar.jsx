@@ -3,7 +3,7 @@ import {
   LayoutDashboard, FilePlus, FileText, ClipboardList,
   DollarSign, CreditCard, CheckSquare, Users, Package,
   ArrowLeftRight, ShoppingCart, Truck, Settings, ChevronDown,
-  LogOut, KeyRound, X, Eye, EyeOff, Calendar, Info,
+  LogOut, KeyRound, X, Eye, EyeOff, Calendar, Info, AlertTriangle,
 } from 'lucide-react'
 import bikloudLogo from '../assets/bikloud-logo-white.svg'
 import { useState, useEffect } from 'react'
@@ -251,6 +251,35 @@ export default function Sidebar({ onClose }) {
   const [modalPass, setModalPass] = useState(false)
   const [modalPlan, setModalPlan] = useState(false)
 
+  // ── Alerta de próximo pago ─────────────────────────────
+  const dismissKey = `alerta_pago_${new Date().toISOString().split('T')[0]}`
+  const [diasPago,        setDiasPago]        = useState(null)
+  const [alertaPago,      setAlertaPago]      = useState(false)
+  const [alertaDismissed, setAlertaDismissed] = useState(
+    () => sessionStorage.getItem(dismissKey) === 'true'
+  )
+
+  useEffect(() => {
+    if (esOperador || !perfil?.cliente_id) return
+    supabase.from('clientes').select('created_at').eq('id', perfil.cliente_id).single()
+      .then(({ data }) => {
+        if (!data?.created_at) return
+        const inicio = new Date(data.created_at)
+        const hoy    = new Date()
+        const dia    = inicio.getDate()
+        let prox = new Date(hoy.getFullYear(), hoy.getMonth(), dia)
+        if (prox <= hoy) prox = new Date(hoy.getFullYear(), hoy.getMonth() + 1, dia)
+        const diff = Math.ceil((prox - hoy) / (1000 * 60 * 60 * 24))
+        setDiasPago(diff)
+        if (diff <= 5) setAlertaPago(true)
+      })
+  }, [perfil?.cliente_id, esOperador])
+
+  function dismissAlertaPago() {
+    sessionStorage.setItem(dismissKey, 'true')
+    setAlertaDismissed(true)
+  }
+
   const plan       = perfil?.plan || 'basico'
   const esPro      = plan === 'profesional' || plan === 'enterprise'
   const esOperador = perfil?.rol === 'operador'
@@ -393,6 +422,36 @@ export default function Sidebar({ onClose }) {
           vencimiento={perfil?.clienteVencimiento}
           onClose={() => setModalPlan(false)}
         />
+      )}
+
+      {/* ── Notificación próximo pago ── */}
+      {alertaPago && !alertaDismissed && diasPago !== null && (
+        <div className="fixed bottom-6 right-6 z-[110] w-80 animate-modal">
+          <div className={`rounded-2xl shadow-2xl border p-4
+            ${diasPago === 0
+              ? 'bg-red-50 border-red-200'
+              : 'bg-amber-50 border-amber-200'}`}>
+            <div className="flex items-start gap-3">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0
+                ${diasPago === 0 ? 'bg-red-100' : 'bg-amber-100'}`}>
+                <AlertTriangle className={`w-4 h-4 ${diasPago === 0 ? 'text-red-600' : 'text-amber-600'}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`font-bold text-sm ${diasPago === 0 ? 'text-red-900' : 'text-amber-900'}`}>
+                  {diasPago === 0 ? '¡El pago vence hoy!' : `Pago en ${diasPago} día${diasPago !== 1 ? 's' : ''}`}
+                </p>
+                <p className={`text-xs mt-0.5 leading-relaxed ${diasPago === 0 ? 'text-red-700' : 'text-amber-700'}`}>
+                  Tu suscripción mensual está próxima a vencer. Realiza el pago para evitar interrupciones en el servicio.
+                </p>
+              </div>
+              <button onClick={dismissAlertaPago}
+                className={`p-1 rounded-lg flex-shrink-0 transition-colors
+                  ${diasPago === 0 ? 'hover:bg-red-100 text-red-400' : 'hover:bg-amber-100 text-amber-500'}`}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
