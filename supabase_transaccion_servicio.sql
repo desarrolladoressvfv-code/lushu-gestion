@@ -134,6 +134,8 @@ BEGIN
   END IF;
 
   -- ── 6. Descontar stock + registrar movimiento ─────────────
+  -- FOR UPDATE bloquea la fila para evitar condición de carrera
+  -- cuando dos servicios se registran simultáneamente con la misma urna.
   IF p_producto_id IS NOT NULL THEN
     SELECT id, stock_actual
     INTO v_inventario_id, v_stock_actual
@@ -144,11 +146,16 @@ BEGIN
         (p_sucursal_id IS NULL AND sucursal_id IS NULL)
         OR sucursal_id = p_sucursal_id
       )
-    LIMIT 1;
+    LIMIT 1
+    FOR UPDATE;
 
     IF v_inventario_id IS NOT NULL THEN
+      IF v_stock_actual <= 0 THEN
+        RAISE EXCEPTION 'Sin stock disponible para el producto seleccionado';
+      END IF;
+
       UPDATE inventario
-      SET stock_actual = GREATEST(0, v_stock_actual - 1)
+      SET stock_actual = v_stock_actual - 1
       WHERE id = v_inventario_id;
 
       INSERT INTO movimientos_inventario (

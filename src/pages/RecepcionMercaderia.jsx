@@ -85,7 +85,7 @@ export default function RecepcionMercaderia() {
         if (insErr) throw insErr
       }
 
-      await supabase.from('movimientos_inventario').insert({
+      const { error: movErr } = await supabase.from('movimientos_inventario').insert({
         cliente_id: CLIENTE_ID,
         producto_id: item.producto_id,
         sucursal_id: oc.sucursal_id || null,
@@ -95,6 +95,7 @@ export default function RecepcionMercaderia() {
         referencia_id: oc.id,
         fecha: hoyCL(),
       })
+      if (movErr) throw movErr
     }
   }
 

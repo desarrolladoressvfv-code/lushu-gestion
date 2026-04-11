@@ -58,7 +58,11 @@ export default function Compras() {
   }
 
   async function guardar() {
-    if (!form.proveedor_id) return
+    if (!form.proveedor_id) { setErrorGuardar('Debes seleccionar un proveedor.'); return }
+    const itemsValidos = items.filter(i => i.producto_id && Number(i.cantidad) > 0 && Number(i.precio_unitario) >= 0)
+    if (itemsValidos.length === 0) { setErrorGuardar('Agrega al menos un producto con cantidad válida.'); return }
+    const itemsInvalidos = items.filter(i => i.producto_id && (Number(i.cantidad) <= 0 || isNaN(Number(i.cantidad))))
+    if (itemsInvalidos.length > 0) { setErrorGuardar('Revisa las cantidades — deben ser mayores a 0.'); return }
     setGuardando(true)
     setErrorGuardar('')
     try {
@@ -72,7 +76,6 @@ export default function Compras() {
         notas: form.notas,
       }).select().single()
       if (ocErr) throw ocErr
-      const itemsValidos = items.filter(i => i.producto_id && Number(i.cantidad) > 0)
       if (itemsValidos.length > 0) {
         const { error: itemsErr } = await supabase.from('items_orden_compra').insert(
           itemsValidos.map(i => ({

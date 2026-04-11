@@ -1,7 +1,10 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') ?? ''
-const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages'
+const ANTHROPIC_URL     = 'https://api.anthropic.com/v1/messages'
+const SUPABASE_URL      = Deno.env.get('SUPABASE_URL') ?? ''
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -18,6 +21,19 @@ serve(async (req) => {
     // ── Verificar autenticación ─────────────────────────────
     const authHeader = req.headers.get('Authorization')
     if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'No autorizado' }), {
+        status: 401,
+        headers: { ...cors, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // ── Validar que el token es una sesión activa en Supabase ──
+    const token = authHeader.replace('Bearer ', '')
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    })
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
       return new Response(JSON.stringify({ error: 'No autorizado' }), {
         status: 401,
         headers: { ...cors, 'Content-Type': 'application/json' },

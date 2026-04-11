@@ -15,19 +15,30 @@ export function AuthProvider({ children }) {
   }
 
   // Cada 10s intenta renovar el refresh token.
-  // Si falla → la sesión fue revocada por otro login → mostrar aviso y cerrar.
+  // Si falla con error HTTP (token inválido/revocado) → cerrar sesión.
+  // Si falla por red (sin status) → reintentar hasta 3 veces consecutivas antes de cerrar.
+  const refreshFailsRef = useRef(0)
   function iniciarCheck() {
     detenerCheck()
+    refreshFailsRef.current = 0
     checkRef.current = setInterval(async () => {
       const { error } = await supabase.auth.refreshSession()
-      if (error) {
-        detenerCheck()
-        setSesionDesplazada(true)
-        setPerfil(null)
-        setSession(null)
-        setClienteId(null)
-        document.title = 'BiKloud'
+      if (!error) {
+        refreshFailsRef.current = 0
+        return
       }
+      const esErrorRed = !error.status || error.status === 0
+      if (esErrorRed) {
+        refreshFailsRef.current += 1
+        if (refreshFailsRef.current < 3) return // tolerar fallos de red momentáneos
+      }
+      // Error definitivo (token revocado) o 3 fallos de red consecutivos
+      detenerCheck()
+      setSesionDesplazada(true)
+      setPerfil(null)
+      setSession(null)
+      setClienteId(null)
+      document.title = 'BiKloud'
     }, 10000)
   }
 
