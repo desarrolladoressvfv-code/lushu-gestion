@@ -104,6 +104,24 @@ function AccesoBloqueado({ logout, razon }) {
   )
 }
 
+/* ── Redirect inteligente: admins → /dashboard, operadores → primer módulo ── */
+const MODULO_RUTAS = {
+  dashboard:   '/dashboard',
+  formulario:  '/formulario',
+  servicios:   '/servicios',
+  fallecidos:  '/fallecidos',
+  formas_pago: '/formas-pago',
+  inventario:  '/inventario',
+  movimientos: '/movimientos',
+  compras:     '/compras',
+  recepcion:   '/recepcion',
+}
+function SmartRedirect({ esOperador, modulos }) {
+  if (!esOperador) return <Navigate to="/dashboard" replace />
+  const primera = modulos.find(m => MODULO_RUTAS[m])
+  return <Navigate to={primera ? MODULO_RUTAS[primera] : '/dashboard'} replace />
+}
+
 /* ── RutaProtegida — definida FUERA de AppRouter para que React
      no la trate como un tipo de componente nuevo en cada render ── */
 function RutaProtegida({ modulo, elemento, soloAdmin = false, esOperador, modulos }) {
@@ -199,12 +217,7 @@ function AppRouter() {
         {/* ── Layout principal ─────────────────────────────── */}
         <Layout>
           <Routes>
-            <Route path="/" element={(() => {
-              if (!esOperador) return <Navigate to="/dashboard" replace />
-              const RUTAS = { dashboard: '/dashboard', formulario: '/formulario', servicios: '/servicios', fallecidos: '/fallecidos', formas_pago: '/formas-pago', inventario: '/inventario', movimientos: '/movimientos', compras: '/compras', recepcion: '/recepcion' }
-              const primera = modulos.find(m => RUTAS[m])
-              return <Navigate to={primera ? RUTAS[primera] : '/dashboard'} replace />
-            })()} />
+            <Route path="/" element={<SmartRedirect esOperador={esOperador} modulos={modulos} />} />
             <Route path="/dashboard"     element={<RutaProtegida {...rp} modulo="dashboard" elemento={<Dashboard />} />} />
             <Route path="/formulario"          element={<RutaProtegida {...rp} modulo="formulario" elemento={<FormularioNuevo />} />} />
             <Route path="/formulario/editar/:id" element={<RutaProtegida {...rp} modulo="formulario" elemento={<FormularioEditar />} />} />
