@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { Eye, EyeOff, LogIn } from 'lucide-react'
+import { Eye, EyeOff, LogIn, AlertTriangle } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 function BiKloudLogo({ width = 320, animated = false }) {
   const cloudClass = animated ? 'logo-anim-cloud' : ''
@@ -50,6 +51,7 @@ const FEATURES = [
 ]
 
 export default function Login() {
+  const { sesionDesplazada, setSesionDesplazada } = useAuth?.() || {}
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
@@ -178,6 +180,16 @@ export default function Login() {
                   </button>
                 </div>
               </div>
+
+              {sesionDesplazada && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-start gap-3">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-amber-800 font-semibold text-sm">Sesión cerrada automáticamente</p>
+                    <p className="text-amber-700 text-xs mt-0.5">Tu cuenta fue iniciada en otro dispositivo. Solo se permite una sesión activa a la vez.</p>
+                  </div>
+                </div>
+              )}
 
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 rounded-2xl px-5 py-4 text-sm font-medium">

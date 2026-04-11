@@ -315,14 +315,16 @@ export default function Inventario() {
                     {r.sucursales?.nombre || 'General'}
                   </td>
 
-                  <td className="px-4 py-3 text-center">
-                    <span className={`text-xl font-bold ${
-                      r.stock_actual === 0             ? 'text-red-600'
-                      : r.stock_actual <= (r.stock_minimo ?? 0) ? 'text-amber-600'
-                      : 'text-slate-900'
-                    }`}>
-                      {r.stock_actual}
-                    </span>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-center">
+                      <span className={`text-xl font-bold ${
+                        r.stock_actual === 0             ? 'text-red-600'
+                        : r.stock_actual <= (r.stock_minimo ?? 0) ? 'text-amber-600'
+                        : 'text-slate-900'
+                      }`}>
+                        {r.stock_actual}
+                      </span>
+                    </div>
                   </td>
 
                   {/* Columna editable inline */}
