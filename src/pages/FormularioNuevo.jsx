@@ -6,6 +6,16 @@ import { hoyCL } from '../lib/fecha'
 
 const chequeVacio = () => ({ monto: '', numero_documento: '', vencimiento: '' })
 
+function formatMiles(v) {
+  if (v === '' || v === null || v === undefined) return ''
+  const digits = String(v).replace(/\D/g, '')
+  if (!digits) return ''
+  return Number(digits).toLocaleString('es-CL')
+}
+function parseMiles(v) {
+  return v.replace(/\D/g, '')
+}
+
 function formatRut(value) {
   const clean = value.replace(/[^0-9kK]/g, '').toUpperCase()
   if (!clean) return ''
@@ -333,7 +343,9 @@ export default function FormularioNuevo() {
           </div>
           <div>
             <label className="label-base">Valor Adicional</label>
-            <input name="valor_adicional" value={venta.valor_adicional} onChange={handleVenta} type="number" className="input-base" />
+            <input type="text" inputMode="numeric" value={formatMiles(venta.valor_adicional)}
+              onChange={e => setVenta(v => ({ ...v, valor_adicional: parseMiles(e.target.value) }))}
+              className="input-base" />
           </div>
           <div>
             <label className="label-base">Total</label>
@@ -341,7 +353,9 @@ export default function FormularioNuevo() {
           </div>
           <div>
             <label className="label-base">Descuento ($)</label>
-            <input name="descuento" value={venta.descuento} onChange={handleVenta} type="number" className="input-base" />
+            <input type="text" inputMode="numeric" value={formatMiles(venta.descuento)}
+              onChange={e => setVenta(v => ({ ...v, descuento: parseMiles(e.target.value) }))}
+              className="input-base" />
           </div>
           <div>
             <label className="label-base">Descuento (%)</label>
@@ -379,15 +393,21 @@ export default function FormularioNuevo() {
           </div>
           <div>
             <label className="label-base">Efectivo</label>
-            <input name="efectivo" value={pago.efectivo} onChange={handlePago} type="number" className="input-base" />
+            <input type="text" inputMode="numeric" value={formatMiles(pago.efectivo)}
+              onChange={e => setPago(p => ({ ...p, efectivo: parseMiles(e.target.value) }))}
+              className="input-base" />
           </div>
           <div>
             <label className="label-base">Tarjeta</label>
-            <input name="tarjeta" value={pago.tarjeta} onChange={handlePago} type="number" className="input-base" />
+            <input type="text" inputMode="numeric" value={formatMiles(pago.tarjeta)}
+              onChange={e => setPago(p => ({ ...p, tarjeta: parseMiles(e.target.value) }))}
+              className="input-base" />
           </div>
           <div>
             <label className="label-base">Monto en Cuotas</label>
-            <input name="monto_cuotas" value={pago.monto_cuotas} onChange={handlePago} type="number" className="input-base" />
+            <input type="text" inputMode="numeric" value={formatMiles(pago.monto_cuotas)}
+              onChange={e => setPago(p => ({ ...p, monto_cuotas: parseMiles(e.target.value) }))}
+              className="input-base" />
           </div>
           <div>
             <label className="label-base">N° Cuotas</label>
@@ -418,7 +438,9 @@ export default function FormularioNuevo() {
               <div key={i} className="grid grid-cols-3 gap-2 items-end">
                 <div>
                   <label className="label-base">Cheque {i + 1} - Monto</label>
-                  <input name="monto" value={c.monto} onChange={e => handleCheque(i, e)} type="number" className="input-base" />
+                  <input type="text" inputMode="numeric" value={formatMiles(c.monto)}
+                    onChange={e => handleCheque(i, { target: { name: 'monto', value: parseMiles(e.target.value) } })}
+                    className="input-base" />
                 </div>
                 <div>
                   <label className="label-base">N° Documento</label>

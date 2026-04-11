@@ -88,7 +88,7 @@ export default function Cheques() {
     <div className="space-y-4 page-enter">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-slate-900">Cheques</h1>
+        <h1 className="text-2xl font-bold text-slate-900">Cuentas por cobrar</h1>
         <button onClick={exportar} className="btn-excel">
           <Download className="w-4 h-4" /> Excel
         </button>

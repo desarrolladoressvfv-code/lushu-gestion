@@ -262,7 +262,7 @@ export default function Sidebar({ onClose }) {
             {!esOperador && <NavItem to="/ventas" icon={DollarSign} label="Ventas" onClick={onClose} tourId="nav-ventas" />}
             {puede('formas_pago') && <NavItem to="/formas-pago" icon={CreditCard} label="Formas de Pago"
               badge={alertas.pagoPendiente} badgeColor="bg-amber-500" onClick={onClose} tourId="nav-formas-pago" />}
-            {!esOperador && <NavItem to="/cheques" icon={CheckSquare} label="Cheques"
+            {!esOperador && <NavItem to="/cheques" icon={CheckSquare} label="Cuentas por cobrar"
               badge={alertas.cheques} badgeColor="bg-red-500" onClick={onClose} tourId="nav-cheques" />}
           </NavGroup>
         )}

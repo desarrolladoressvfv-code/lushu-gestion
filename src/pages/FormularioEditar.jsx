@@ -121,7 +121,6 @@ export default function FormularioEditar() {
         fecha_servicio: servicio.fecha_servicio,
         nombre_cliente: servicio.nombre_cliente.trim(),
         telefono:       servicio.telefono || null,
-        producto_id:    servicio.producto_id || null,
         sucursal_id:    servicio.sucursal_id || null,
         color:          servicio.color || null,
         lugar_retiro:   servicio.lugar_retiro || null,
@@ -231,10 +230,10 @@ export default function FormularioEditar() {
           </div>
           <div>
             <label className="label-base">Tipo de Urna</label>
-            <select name="producto_id" value={servicio.producto_id} onChange={handleServ} className="input-base">
-              <option value="">Seleccionar...</option>
-              {productos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-            </select>
+            <input readOnly
+              value={productos.find(p => p.id === servicio.producto_id)?.nombre || '—'}
+              className="input-base bg-slate-50 text-slate-500 cursor-not-allowed"
+              title="La urna no puede modificarse" />
           </div>
           <div>
             <label className="label-base">Color</label>
