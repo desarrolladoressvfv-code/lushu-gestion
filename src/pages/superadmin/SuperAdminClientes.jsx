@@ -410,17 +410,10 @@ export default function SuperAdminClientes() {
                   ultimoCambioStr = d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: '2-digit' })
                 }
 
-                // Calcular próximo pago (mismo día del mes que created_at, mes siguiente si ya pasó)
-                function proximoPago(createdAt) {
-                  if (!createdAt) return '—'
-                  const inicio = new Date(createdAt)
-                  const hoy2   = new Date()
-                  const dia    = inicio.getDate()
-                  let prox = new Date(hoy2.getFullYear(), hoy2.getMonth(), dia)
-                  if (prox <= hoy2) prox = new Date(hoy2.getFullYear(), hoy2.getMonth() + 1, dia)
-                  return prox.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' })
-                }
-                const proxPago = proximoPago(c.created_at)
+                // Próximo pago = fecha de vencimiento (si el admin la cambia, cambia el pago)
+                const proxPago = c.fecha_vencimiento
+                  ? new Date(c.fecha_vencimiento).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                  : '—'
 
                 return (
                   <tr key={c.id} className={`tabla-fila ${!activo ? 'opacity-60' : ''}`}>
