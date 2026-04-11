@@ -5,9 +5,9 @@ const AuthContext = createContext(null)
 const SESSION_KEY = 'bikloud_st'
 
 export function AuthProvider({ children }) {
-  const [session, setSession]           = useState(null)
-  const [perfil, setPerfil]             = useState(null)
-  const [cargando, setCargando]         = useState(true)
+  const [session, setSession]                   = useState(null)
+  const [perfil, setPerfil]                     = useState(null)
+  const [cargando, setCargando]                 = useState(true)
   const [sesionDesplazada, setSesionDesplazada] = useState(false)
   const checkRef = useRef(null)
 
@@ -15,23 +15,20 @@ export function AuthProvider({ children }) {
     if (checkRef.current) { clearInterval(checkRef.current); checkRef.current = null }
   }
 
-  function iniciarCheck(userId) {
+  // Verifica cada 15s si el token local sigue siendo el vigente en Auth metadata
+  function iniciarCheck() {
     detenerCheck()
     checkRef.current = setInterval(async () => {
-      let miToken = localStorage.getItem(SESSION_KEY)
-      if (!miToken) {
-        // Sin token local → reclamar sesión (genera token y guarda en DB)
-        miToken = crypto.randomUUID()
-        localStorage.setItem(SESSION_KEY, miToken)
-        await supabase.from('usuarios').update({ session_token: miToken }).eq('auth_user_id', userId)
-        return
-      }
-      // Verificar que el token local sigue siendo el vigente en DB
-      const { data } = await supabase.from('usuarios')
-        .select('session_token').eq('auth_user_id', userId).single()
-      if (data?.session_token && data.session_token !== miToken) {
+      const miToken = sessionStorage.getItem(SESSION_KEY)
+      if (!miToken) return
+
+      const { data: { user }, error } = await supabase.auth.getUser()
+      if (error || !user) { detenerCheck(); return }
+
+      const tokenDB = user.user_metadata?.session_token
+      if (tokenDB && tokenDB !== miToken) {
         detenerCheck()
-        localStorage.removeItem(SESSION_KEY)
+        sessionStorage.removeItem(SESSION_KEY)
         setSesionDesplazada(true)
         await supabase.auth.signOut()
       }
@@ -55,28 +52,18 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function cargarPerfil(userId, esNuevoLogin = false) {
-    // 1. Obtener rol y datos del usuario
     const { data: usuario } = await supabase
       .from('usuarios')
       .select('rol, cliente_id, nombre, activo, debe_cambiar_pass, acceso_tipo, sucursal_id, modulos_permitidos')
       .eq('auth_user_id', userId)
       .single()
 
-    // Cargar session_token por separado (columna puede no existir aún)
-    try {
-      const { data: st } = await supabase.from('usuarios')
-        .select('session_token').eq('auth_user_id', userId).single()
-      if (st) usuario.session_token = st.session_token
-    } catch (_) { /* columna no existe aún */ }
-
-    // Los superadmin no necesitan verificación de licencia
     if (usuario?.rol === 'superadmin') {
       setPerfil(usuario)
       setCargando(false)
       return
     }
 
-    // Usuario inactivo — bloquear acceso
     if (usuario && usuario.activo === false) {
       usuario.clienteEstado = 'bloqueado'
       usuario.licenciaRazon = 'Usuario desactivado'
@@ -98,31 +85,37 @@ export function AuthProvider({ children }) {
         usuario.plan                 = licencia.plan           || 'basico'
         usuario.max_sucursales       = licencia.max_sucursales || 1
         usuario.onboardingCompletado = licencia.onboarding_completado ?? false
-        // Datos de rol extendido
         usuario.debeCambiarPass      = usuario.debe_cambiar_pass ?? false
         usuario.accesoTipo           = usuario.acceso_tipo        || 'general'
         usuario.sucursalRestringida  = usuario.sucursal_id        || null
         usuario.modulosPermitidos    = usuario.modulos_permitidos || []
         setClienteId(usuario.cliente_id)
         if (licencia.nombre) document.title = `BiKloud · ${licencia.nombre}`
-        // ── Sesión única: registrar token en DB ──────────────
+
+        // ── Sesión única via Auth metadata ───────────────────
         if (esNuevoLogin) {
+          // Nuevo login: generar token → guardar en sessionStorage Y en Auth metadata
           const token = crypto.randomUUID()
-          localStorage.setItem(SESSION_KEY, token)
-          supabase.from('usuarios').update({ session_token: token }).eq('auth_user_id', userId)
+          sessionStorage.setItem(SESSION_KEY, token)
+          // Actualizar metadata en Supabase Auth (sin depender de RLS de usuarios)
+          await supabase.auth.updateUser({ data: { session_token: token } })
+          iniciarCheck()
         } else {
-          // Recarga de página: verificar que el token local sigue vigente
-          const miToken = localStorage.getItem(SESSION_KEY)
-          if (miToken && usuario.session_token && miToken !== usuario.session_token) {
-            // Ya hay otra sesión activa → desplazar esta
-            localStorage.removeItem(SESSION_KEY)
-            setSesionDesplazada(true)
-            await supabase.auth.signOut()
-            return
+          // Recarga de página: verificar token
+          const miToken = sessionStorage.getItem(SESSION_KEY)
+          if (miToken) {
+            const { data: { user } } = await supabase.auth.getUser()
+            const tokenDB = user?.user_metadata?.session_token
+            if (tokenDB && miToken !== tokenDB) {
+              sessionStorage.removeItem(SESSION_KEY)
+              setSesionDesplazada(true)
+              await supabase.auth.signOut()
+              return
+            }
           }
+          iniciarCheck()
         }
-        iniciarCheck(userId)
-        // Registrar login + actualizar último acceso
+
         if (esNuevoLogin) {
           supabase.rpc('registrar_auditoria', {
             p_accion: 'login', p_modulo: 'sesion', p_descripcion: 'Inicio de sesión',
@@ -138,7 +131,7 @@ export function AuthProvider({ children }) {
 
   async function logout() {
     detenerCheck()
-    localStorage.removeItem(SESSION_KEY)
+    sessionStorage.removeItem(SESSION_KEY)
     supabase.rpc('registrar_auditoria', {
       p_accion: 'logout', p_modulo: 'sesion', p_descripcion: 'Cierre de sesión',
     })
@@ -157,19 +150,13 @@ export function AuthProvider({ children }) {
 
   async function completarOnboarding() {
     if (!perfil?.cliente_id) return
-    await supabase
-      .from('clientes')
-      .update({ onboarding_completado: true })
-      .eq('id', perfil.cliente_id)
+    await supabase.from('clientes').update({ onboarding_completado: true }).eq('id', perfil.cliente_id)
     setPerfil(p => ({ ...p, onboardingCompletado: true }))
   }
 
   async function reiniciarOnboarding() {
     if (!perfil?.cliente_id) return
-    await supabase
-      .from('clientes')
-      .update({ onboarding_completado: false })
-      .eq('id', perfil.cliente_id)
+    await supabase.from('clientes').update({ onboarding_completado: false }).eq('id', perfil.cliente_id)
     setPerfil(p => ({ ...p, onboardingCompletado: false }))
   }
 
