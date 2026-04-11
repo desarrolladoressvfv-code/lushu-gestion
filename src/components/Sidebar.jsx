@@ -251,6 +251,13 @@ export default function Sidebar({ onClose }) {
   const [modalPass, setModalPass] = useState(false)
   const [modalPlan, setModalPlan] = useState(false)
 
+  // Derivados de perfil — deben ir ANTES de cualquier useEffect que los use
+  const plan       = perfil?.plan || 'basico'
+  const esPro      = plan === 'profesional' || plan === 'enterprise'
+  const esOperador = perfil?.rol === 'operador'
+  const modulos    = perfil?.modulosPermitidos || []
+  const puede      = (m) => !esOperador || modulos.includes(m)
+
   // ── Alerta de próximo pago ─────────────────────────────
   const dismissKey = `alerta_pago_${new Date().toISOString().split('T')[0]}`
   const [diasPago,        setDiasPago]        = useState(null)
@@ -279,12 +286,6 @@ export default function Sidebar({ onClose }) {
     sessionStorage.setItem(dismissKey, 'true')
     setAlertaDismissed(true)
   }
-
-  const plan       = perfil?.plan || 'basico'
-  const esPro      = plan === 'profesional' || plan === 'enterprise'
-  const esOperador = perfil?.rol === 'operador'
-  const modulos    = perfil?.modulosPermitidos || []
-  const puede      = (m) => !esOperador || modulos.includes(m)
 
   const PLAN_BADGE = { basico: { label: 'Básico', color: 'bg-slate-600 text-slate-300' }, profesional: { label: 'Profesional', color: 'bg-blue-600 text-blue-100' }, enterprise: { label: 'Enterprise', color: 'bg-violet-600 text-violet-100' } }
   const planInfo = PLAN_BADGE[plan] || PLAN_BADGE.basico
