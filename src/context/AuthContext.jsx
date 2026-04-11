@@ -15,24 +15,34 @@ export function AuthProvider({ children }) {
     if (checkRef.current) { clearInterval(checkRef.current); checkRef.current = null }
   }
 
-  // Verifica cada 15s si el token local sigue siendo el vigente en Auth metadata
+  async function verificarSesion() {
+    let miToken = sessionStorage.getItem(SESSION_KEY)
+
+    if (!miToken) {
+      // Sin token local → reclamar sesión (funciona incluso con sesiones ya abiertas)
+      miToken = crypto.randomUUID()
+      sessionStorage.setItem(SESSION_KEY, miToken)
+      await supabase.auth.updateUser({ data: { session_token: miToken } })
+      return
+    }
+
+    const { data, error } = await supabase.auth.getUser()
+    if (error || !data?.user) { detenerCheck(); return }
+
+    const tokenDB = data.user.user_metadata?.session_token
+    if (tokenDB && tokenDB !== miToken) {
+      detenerCheck()
+      sessionStorage.removeItem(SESSION_KEY)
+      setSesionDesplazada(true)
+      await supabase.auth.signOut()
+    }
+  }
+
   function iniciarCheck() {
     detenerCheck()
-    checkRef.current = setInterval(async () => {
-      const miToken = sessionStorage.getItem(SESSION_KEY)
-      if (!miToken) return
-
-      const { data: { user }, error } = await supabase.auth.getUser()
-      if (error || !user) { detenerCheck(); return }
-
-      const tokenDB = user.user_metadata?.session_token
-      if (tokenDB && tokenDB !== miToken) {
-        detenerCheck()
-        sessionStorage.removeItem(SESSION_KEY)
-        setSesionDesplazada(true)
-        await supabase.auth.signOut()
-      }
-    }, 15000)
+    // Primera verificación inmediata, luego cada 10s
+    verificarSesion()
+    checkRef.current = setInterval(verificarSesion, 10000)
   }
 
   useEffect(() => {
