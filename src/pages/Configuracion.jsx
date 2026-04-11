@@ -1061,7 +1061,8 @@ function TabAuditoria() {
   useEffect(() => {
     supabase.from('auditoria').select('*')
       .eq('cliente_id', CLIENTE_ID)
-      .order('fecha', { ascending: false })
+      .neq('modulo', 'sesion')
+      .order('created_at', { ascending: false })
       .limit(500)
       .then(({ data }) => { setRows(data || []); setLoading(false) })
   }, [])
@@ -1070,8 +1071,8 @@ function TabAuditoria() {
     if (filtroUsuario && !r.nombre_usuario?.toLowerCase().includes(filtroUsuario.toLowerCase())) return false
     if (filtroModulo && r.modulo !== filtroModulo) return false
     if (filtroAccion && r.accion !== filtroAccion) return false
-    if (desde && r.fecha < desde) return false
-    if (hasta && r.fecha?.slice(0,10) > hasta) return false
+    if (desde && r.created_at?.slice(0, 10) < desde) return false
+    if (hasta && r.created_at?.slice(0, 10) > hasta) return false
     return true
   })
 
@@ -1080,7 +1081,7 @@ function TabAuditoria() {
 
   function exportar() {
     const datos = filtrados.map(r => ({
-      'Fecha':    new Date(r.fecha).toLocaleString('es-CL'),
+      'Fecha':    new Date(r.created_at).toLocaleString('es-CL', { timeZone: 'America/Santiago' }),
       'Usuario':  r.nombre_usuario || '',
       'Rol':      r.rol || '',
       'Acción':   r.accion || '',
@@ -1128,7 +1129,7 @@ function TabAuditoria() {
                 ) : filtrados.map(r => (
                   <tr key={r.id} className="tabla-fila">
                     <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
-                      {new Date(r.fecha).toLocaleString('es-CL')}
+                      {new Date(r.created_at).toLocaleString('es-CL', { timeZone: 'America/Santiago' })}
                     </td>
                     <td className="px-4 py-3 font-medium text-slate-900">{r.nombre_usuario || '—'}</td>
                     <td className="px-4 py-3">
