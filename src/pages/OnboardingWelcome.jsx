@@ -51,7 +51,7 @@ const MODULOS = [
   { icon: DollarSign,      label: 'Finanzas',    desc: 'Ventas, cobros y cheques' },
   { icon: Package,         label: 'Inventario',  desc: 'Control de stock por sucursal' },
   { icon: ShoppingCart,    label: 'Compras',     desc: 'Órdenes a proveedores' },
-  { icon: Sparkles,        label: "Lushu's",     desc: 'Tu asistente inteligente' },
+  { icon: Sparkles,        label: "Luchus",     desc: 'Tu asistente inteligente' },
 ]
 
 export default function OnboardingWelcome({ onComenzar, onSaltar }) {

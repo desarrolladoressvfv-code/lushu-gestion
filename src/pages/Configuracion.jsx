@@ -131,7 +131,7 @@ function TabEmpresa() {
           <div>
             <h3 className="font-semibold text-slate-900 text-sm">Nombre de la empresa</h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Aparece en el sidebar, encabezado, PDFs de cotización y el asistente Lushu's.
+              Aparece en el sidebar, encabezado, PDFs de cotización y el asistente Luchus.
             </p>
           </div>
         </div>

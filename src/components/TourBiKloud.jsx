@@ -16,7 +16,7 @@ const MODULOS_FIN = [
   { icon: CreditCard,      label: 'Formas Pago'  },
   { icon: Package,         label: 'Inventario'   },
   { icon: ShoppingCart,    label: 'Compras'      },
-  { icon: Sparkles,        label: "Lushu's"      },
+  { icon: Sparkles,        label: "Luchus"      },
   { icon: Users,           label: 'Fallecidos'   },
 ]
 

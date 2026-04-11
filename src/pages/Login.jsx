@@ -46,7 +46,7 @@ const FEATURES = [
   { label: 'Servicios',   desc: 'Registro completo de servicios' },
   { label: 'Inventario',  desc: 'Control de stock por sucursal' },
   { label: 'Finanzas',    desc: 'Ventas, cobros y cheques' },
-  { label: "Lushu's IA",  desc: 'Tu asistente inteligente' },
+  { label: "Luchus IA",  desc: 'Tu asistente inteligente' },
 ]
 
 export default function Login() {
