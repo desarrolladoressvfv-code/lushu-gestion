@@ -62,19 +62,24 @@ function NavGroup({ label, children, defaultOpen = true }) {
 }
 
 /* ── Modal Info Plan ────────────────────────────────────── */
-function ModalInfoPlan({ plan, planInfo, clienteId, vencimiento, onClose }) {
-  const [createdAt, setCreatedAt] = useState(null)
+function ModalInfoPlan({ plan, planInfo, clienteId, onClose }) {
+  const [datos, setDatos] = useState(null)
 
   useEffect(() => {
     if (!clienteId) return
-    supabase.from('clientes').select('created_at').eq('id', clienteId).single()
-      .then(({ data }) => { if (data) setCreatedAt(data.created_at) })
+    supabase.from('clientes')
+      .select('created_at, fecha_vencimiento, valor_plan')
+      .eq('id', clienteId)
+      .single()
+      .then(({ data }) => { if (data) setDatos(data) })
   }, [clienteId])
 
   function formatFecha(iso) {
     if (!iso) return '—'
     return new Date(iso).toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' })
   }
+
+  const cargando = datos === null
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
@@ -95,15 +100,23 @@ function ModalInfoPlan({ plan, planInfo, clienteId, vencimiento, onClose }) {
 
         {/* Body */}
         <div className="p-5 space-y-4">
-          {/* Plan actual */}
+          {/* Plan actual + valor */}
           <div className="bg-slate-50 rounded-xl p-4 flex items-center gap-3">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${planInfo.color}`}>
               <span className="text-sm font-bold">{planInfo.label.charAt(0)}</span>
             </div>
-            <div>
+            <div className="flex-1 min-w-0">
               <p className="text-xs text-slate-400 font-medium">Plan actual</p>
               <p className="font-bold text-slate-900">{planInfo.label}</p>
             </div>
+            {datos?.valor_plan != null && (
+              <div className="text-right flex-shrink-0">
+                <p className="text-xs text-slate-400">Mensual</p>
+                <p className="text-base font-extrabold text-blue-600">
+                  ${Number(datos.valor_plan).toLocaleString('es-CL')}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Fechas */}
@@ -113,7 +126,7 @@ function ModalInfoPlan({ plan, planInfo, clienteId, vencimiento, onClose }) {
               <div>
                 <p className="text-xs text-slate-400">Fecha de inicio</p>
                 <p className="text-sm font-semibold text-slate-800">
-                  {createdAt ? formatFecha(createdAt) : <span className="text-slate-300">Cargando...</span>}
+                  {cargando ? <span className="text-slate-300">Cargando...</span> : formatFecha(datos.created_at)}
                 </p>
               </div>
             </div>
@@ -122,7 +135,7 @@ function ModalInfoPlan({ plan, planInfo, clienteId, vencimiento, onClose }) {
               <div>
                 <p className="text-xs text-slate-400">Próximo pago</p>
                 <p className="text-sm font-bold text-blue-600">
-                  {vencimiento ? formatFecha(vencimiento) : '—'}
+                  {cargando ? <span className="text-slate-300">Cargando...</span> : formatFecha(datos.fecha_vencimiento)}
                 </p>
               </div>
             </div>
@@ -404,7 +417,6 @@ export default function Sidebar({ onClose }) {
           plan={plan}
           planInfo={planInfo}
           clienteId={perfil?.cliente_id}
-          vencimiento={perfil?.clienteVencimiento}
           onClose={() => setModalPlan(false)}
         />
       )}
