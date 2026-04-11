@@ -47,6 +47,7 @@ export default function FormularioNuevo() {
     trabajador_id: '',
   })
 
+  const [ivaHabilitado, setIvaHabilitado] = useState(true)
   const [conIva, setConIva] = useState(true)
   const [venta, setVenta] = useState({ valor_servicio: 0, valor_adicional: '', descuento: '' })
   const [pago, setPago] = useState({ convenio_id: '', valor_convenio: 0, efectivo: '', tarjeta: '', monto_cuotas: '', cuotas: '', info_adicional: '' })
@@ -55,18 +56,22 @@ export default function FormularioNuevo() {
 
   useEffect(() => {
     async function cargar() {
-      const [{ data: p }, { data: c }, { data: t }, { data: s }, { data: num }] = await Promise.all([
+      const [{ data: p }, { data: c }, { data: t }, { data: s }, { data: num }, { data: cli }] = await Promise.all([
         supabase.from('productos').select('id,nombre,precio').eq('cliente_id', CLIENTE_ID).eq('activo', true).order('numero'),
         supabase.from('convenios').select('id,nombre,valor').eq('cliente_id', CLIENTE_ID).eq('activo', true).order('numero'),
         supabase.from('trabajadores').select('id,nombre').eq('cliente_id', CLIENTE_ID).eq('activo', true).order('numero'),
         supabase.from('sucursales').select('id,nombre').eq('cliente_id', CLIENTE_ID).eq('activo', true).order('nombre'),
         supabase.rpc('get_next_formulario', { p_cliente_id: CLIENTE_ID }),
+        supabase.from('clientes').select('iva_habilitado').eq('id', CLIENTE_ID).single(),
       ])
       setProductos(p || [])
       setConvenios(c || [])
       setTrabajadores(t || [])
       setSucursales(s || [])
       setNumeroFormulario(num)
+      const habilitado = cli?.iva_habilitado ?? true
+      setIvaHabilitado(habilitado)
+      if (!habilitado) setConIva(false)
     }
     cargar()
   }, [])
@@ -309,18 +314,20 @@ export default function FormularioNuevo() {
       <div className="form-section">
         <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
           <h2 className="text-base font-bold text-slate-800">Venta</h2>
-          <button
-            type="button"
-            onClick={() => setConIva(v => !v)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
-              conIva
-                ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
-                : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
-            }`}
-          >
-            <span className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 ${conIva ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-400'}`} />
-            {conIva ? 'Con IVA (19%)' : 'Sin IVA'}
-          </button>
+          {ivaHabilitado && (
+            <button
+              type="button"
+              onClick={() => setConIva(v => !v)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
+                conIva
+                  ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                  : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
+              }`}
+            >
+              <span className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 ${conIva ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-400'}`} />
+              {conIva ? 'Con IVA (19%)' : 'Sin IVA'}
+            </button>
+          )}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div>
@@ -347,10 +354,12 @@ export default function FormularioNuevo() {
             <label className="label-base">Venta Neta</label>
             <input readOnly value={clp(venta_neta)} className="input-base bg-slate-50 font-semibold" />
           </div>
-          <div>
-            <label className="label-base">IVA {conIva ? '(19%)' : '(no aplica)'}</label>
-            <input readOnly value={conIva ? clp(iva) : '—'} className="input-base bg-slate-50 text-slate-400" />
-          </div>
+          {ivaHabilitado && (
+            <div>
+              <label className="label-base">IVA {conIva ? '(19%)' : '(no aplica)'}</label>
+              <input readOnly value={conIva ? clp(iva) : '—'} className="input-base bg-slate-50 text-slate-400" />
+            </div>
+          )}
           <div className="col-span-2">
             <label className="label-base">Venta Total</label>
             <input readOnly value={clp(venta_total)} className="input-base bg-blue-50 text-blue-700 font-bold text-base" />

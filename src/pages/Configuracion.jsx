@@ -71,10 +71,30 @@ function TabEmpresa() {
   const [ok,       setOk]       = useState(false)
   const [error,    setError]    = useState('')
 
+  const [ivaHabilitado,    setIvaHabilitado]    = useState(true)
+  const [guardandoIva,     setGuardandoIva]     = useState(false)
+  const [cargandoIva,      setCargandoIva]      = useState(true)
+
   // Sincronizar input cuando carga el contexto
   useEffect(() => {
     if (!cargandoEmpresa) setValor(nombreEmpresa)
   }, [nombreEmpresa, cargandoEmpresa])
+
+  useEffect(() => {
+    supabase.from('clientes').select('iva_habilitado').eq('id', CLIENTE_ID).single()
+      .then(({ data }) => {
+        if (data) setIvaHabilitado(data.iva_habilitado ?? true)
+        setCargandoIva(false)
+      })
+  }, [])
+
+  async function toggleIva() {
+    const nuevo = !ivaHabilitado
+    setGuardandoIva(true)
+    await supabase.from('clientes').update({ iva_habilitado: nuevo }).eq('id', CLIENTE_ID)
+    setIvaHabilitado(nuevo)
+    setGuardandoIva(false)
+  }
 
   async function guardar(e) {
     e.preventDefault()
@@ -168,6 +188,50 @@ function TabEmpresa() {
           </div>
         </div>
       )}
+
+      {/* IVA */}
+      <div className="form-section">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+            <span className="text-emerald-700 font-bold text-xs">%</span>
+          </div>
+          <div>
+            <h3 className="font-semibold text-slate-900 text-sm">IVA en Nuevo Servicio</h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Si está habilitado, aparece la opción de aplicar IVA (19%) al crear un servicio.
+            </p>
+          </div>
+        </div>
+
+        {cargandoIva ? (
+          <div className="skeleton h-10 w-48 rounded-xl" />
+        ) : (
+          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200">
+            <div>
+              <p className="text-sm font-semibold text-slate-800">
+                IVA (19%) {ivaHabilitado ? 'habilitado' : 'deshabilitado'}
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {ivaHabilitado
+                  ? 'El botón IVA aparece en Nuevo Servicio y se puede activar/desactivar por servicio.'
+                  : 'El campo IVA no aparece en Nuevo Servicio y no se aplica.'}
+              </p>
+            </div>
+            <button
+              onClick={toggleIva}
+              disabled={guardandoIva}
+              className={`relative w-12 h-6 rounded-full transition-colors duration-200 flex-shrink-0 ml-4 ${
+                ivaHabilitado ? 'bg-emerald-500' : 'bg-slate-300'
+              }`}
+              title={ivaHabilitado ? 'Deshabilitar IVA' : 'Habilitar IVA'}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
+                ivaHabilitado ? 'translate-x-6' : 'translate-x-0'
+              }`} />
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
