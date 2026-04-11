@@ -93,7 +93,7 @@ function buildSteps(esPro) {
     },
     esPro && {
       id: 'chatbot-fab',
-      title: '✨ Lushu\'s — Tu asistente IA',
+      title: '✨ Luchus — Tu asistente IA',
       desc: 'Pregúntale cualquier cosa sobre tus datos: "¿Cuántos servicios tuve este mes?" o "¿Qué productos están por vencer?"',
     },
     {
