@@ -16,15 +16,8 @@ export function AuthProvider({ children }) {
   }
 
   async function verificarSesion() {
-    let miToken = sessionStorage.getItem(SESSION_KEY)
-
-    if (!miToken) {
-      // Sin token local → reclamar sesión (funciona incluso con sesiones ya abiertas)
-      miToken = crypto.randomUUID()
-      sessionStorage.setItem(SESSION_KEY, miToken)
-      await supabase.auth.updateUser({ data: { session_token: miToken } })
-      return
-    }
+    const miToken = sessionStorage.getItem(SESSION_KEY)
+    if (!miToken) return // sin token local, nada que verificar
 
     const { data, error } = await supabase.auth.getUser()
     if (error || !data?.user) { detenerCheck(); return }
@@ -38,10 +31,28 @@ export function AuthProvider({ children }) {
     }
   }
 
+  async function reclamarSesion() {
+    // Solo en login nuevo: generar token y registrarlo en Auth metadata
+    const token = crypto.randomUUID()
+    sessionStorage.setItem(SESSION_KEY, token)
+    await supabase.auth.updateUser({ data: { session_token: token } })
+  }
+
+  async function adoptarSesion() {
+    // En recarga/sesión existente: adoptar el token que ya está en la DB
+    const { data } = await supabase.auth.getUser()
+    const tokenDB = data?.user?.user_metadata?.session_token
+    if (tokenDB) {
+      // Adoptar el token existente del servidor
+      sessionStorage.setItem(SESSION_KEY, tokenDB)
+    } else {
+      // Nunca hubo token (primera vez) → reclamar
+      await reclamarSesion()
+    }
+  }
+
   function iniciarCheck() {
     detenerCheck()
-    // Primera verificación inmediata, luego cada 10s
-    verificarSesion()
     checkRef.current = setInterval(verificarSesion, 10000)
   }
 
@@ -104,27 +115,11 @@ export function AuthProvider({ children }) {
 
         // ── Sesión única via Auth metadata ───────────────────
         if (esNuevoLogin) {
-          // Nuevo login: generar token → guardar en sessionStorage Y en Auth metadata
-          const token = crypto.randomUUID()
-          sessionStorage.setItem(SESSION_KEY, token)
-          // Actualizar metadata en Supabase Auth (sin depender de RLS de usuarios)
-          await supabase.auth.updateUser({ data: { session_token: token } })
-          iniciarCheck()
+          await reclamarSesion() // genera token nuevo → desplaza sesiones anteriores
         } else {
-          // Recarga de página: verificar token
-          const miToken = sessionStorage.getItem(SESSION_KEY)
-          if (miToken) {
-            const { data: { user } } = await supabase.auth.getUser()
-            const tokenDB = user?.user_metadata?.session_token
-            if (tokenDB && miToken !== tokenDB) {
-              sessionStorage.removeItem(SESSION_KEY)
-              setSesionDesplazada(true)
-              await supabase.auth.signOut()
-              return
-            }
-          }
-          iniciarCheck()
+          await adoptarSesion()  // adopta token existente → no compite con otras sesiones
         }
+        iniciarCheck()
 
         if (esNuevoLogin) {
           supabase.rpc('registrar_auditoria', {
