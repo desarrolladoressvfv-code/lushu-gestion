@@ -144,7 +144,11 @@ export default function Servicios() {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {filtrados.length === 0 ? (
-                  <tr><td colSpan={11} className="text-center py-10 text-slate-400">Sin registros</td></tr>
+                  <tr><td colSpan={11} className="text-center py-10 text-slate-400">
+                    {busqueda || filtroProducto || filtroTrabajador || filtroSucursal || filtroDesde || filtroHasta
+                      ? 'No hay resultados para los filtros aplicados'
+                      : 'Sin registros'}
+                  </td></tr>
                 ) : paginados.map(r => (
                   <tr key={r.id} className="tabla-fila">
                     <td className="px-4 py-3 font-mono font-bold text-blue-600">#{r.numero_formulario}</td>

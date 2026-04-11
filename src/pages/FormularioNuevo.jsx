@@ -32,6 +32,22 @@ function formatRut(value) {
   return formatted + '-' + dv
 }
 
+function validarRut(rut) {
+  if (!rut) return true // vacío es válido (campo opcional)
+  const clean = rut.replace(/[^0-9kK]/g, '').toUpperCase()
+  if (clean.length < 2) return false
+  const dv    = clean.slice(-1)
+  const body  = clean.slice(0, -1)
+  let suma = 0, factor = 2
+  for (let i = body.length - 1; i >= 0; i--) {
+    suma += parseInt(body[i]) * factor
+    factor = factor === 7 ? 2 : factor + 1
+  }
+  const dvEsperado = 11 - (suma % 11)
+  const dvCalc = dvEsperado === 11 ? '0' : dvEsperado === 10 ? 'K' : String(dvEsperado)
+  return dv === dvCalc
+}
+
 export default function FormularioNuevo() {
   const navigate = useNavigate()
   const [productos, setProductos] = useState([])
@@ -133,6 +149,7 @@ export default function FormularioNuevo() {
     if (!numeroFormulario) { setError('El N° de formulario aún no se generó. Recarga la página e intenta de nuevo.'); return }
     if (!servicio.nombre_cliente.trim()) { setError('El nombre del cliente es obligatorio.'); return }
     if (sinStock) { setError('No hay stock disponible para la urna seleccionada.'); return }
+    if (fallecido.rut && !validarRut(fallecido.rut)) { setError('El RUT del fallecido no es válido.'); return }
     setError('')
     setGuardando(true)
     try {
@@ -508,10 +525,13 @@ export default function FormularioNuevo() {
               name="rut"
               value={fallecido.rut}
               onChange={e => setFallecido(f => ({ ...f, rut: formatRut(e.target.value) }))}
-              className="input-base"
+              className={`input-base ${fallecido.rut && !validarRut(fallecido.rut) ? 'border-red-400 focus:ring-red-400' : ''}`}
               placeholder="12.345.678-9"
               maxLength={12}
             />
+            {fallecido.rut && !validarRut(fallecido.rut) && (
+              <p className="text-red-500 text-xs mt-1">RUT inválido</p>
+            )}
           </div>
           <div>
             <label className="label-base">Fecha Defunción</label>

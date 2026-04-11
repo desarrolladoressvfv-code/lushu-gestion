@@ -214,8 +214,8 @@ export default function Cotizacion() {
               </p>
               {sinStock && <p className="text-red-600 text-xs mt-0.5">La cotización puede generarse como referencia, pero no podrá convertirse en servicio hasta reponer inventario.</p>}
               {stockBajo && <p className="text-amber-600 text-xs mt-0.5">El stock está igual o por debajo del mínimo configurado ({stockInfo.stock_minimo}).</p>}
-              {/* Detalle por sucursal */}
-              {stockSucursales.length > 1 && (
+              {/* Detalle por sucursal: solo cuando no hay sucursal seleccionada */}
+              {!form.sucursal_id && stockSucursales.length > 1 && (
                 <div className="flex flex-wrap gap-2 mt-2">
                   {stockSucursales.map(s => (
                     <span key={s.sucursal_id}

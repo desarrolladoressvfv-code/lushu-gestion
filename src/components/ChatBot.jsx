@@ -141,7 +141,7 @@ Máximo 180 palabras. Usa viñetas y emojis para el resumen.`
     } catch (e) {
       setHistorial([{
         role: 'assistant',
-        content: `No pude conectarme en este momento.\n\nError: ${e.message}\n\nPuedes intentar preguntar directamente o reiniciar el chat con el botón ↺.`,
+        content: 'No pude conectarme en este momento. Puedes intentar preguntar directamente o reiniciar el chat con el botón ↺.',
       }])
     } finally {
       setCargando(false)
@@ -170,7 +170,7 @@ Máximo 180 palabras. Usa viñetas y emojis para el resumen.`
     } catch (e) {
       setHistorial(prev => [...prev, {
         role: 'assistant',
-        content: `Ocurrió un error al procesar tu pregunta.\n\nError: ${e.message}`,
+        content: 'Ocurrió un error al procesar tu pregunta. Por favor intenta de nuevo.',
       }])
     } finally {
       setCargando(false)
