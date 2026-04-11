@@ -203,71 +203,132 @@ function SeccionCheques() {
 
 // ── Sección Cuotas ─────────────────────────────────────────────────────────────
 function SeccionCuotas() {
-  const [rows, setRows]               = useState([])
+  const [grupos, setGrupos]           = useState([]) // [{ fp, cliente, cuotas: [] }]
   const [loading, setLoading]         = useState(true)
   const [filtro, setFiltro]           = useState('')
-  const [historialItem, setHistorialItem] = useState(null)
+  const [expandidos, setExpandidos]   = useState(new Set())
 
   async function cargar() {
+    // 1. Formas de pago con cuotas
     const { data: fp } = await supabase.from('formas_pago')
-      .select('id, numero_formulario, monto_cuotas, cuotas, estado, fecha')
+      .select('id, numero_formulario, monto_cuotas, cuotas, fecha')
       .eq('cliente_id', CLIENTE_ID)
       .gt('monto_cuotas', 0)
       .order('numero_formulario', { ascending: false })
 
-    if (!fp || fp.length === 0) { setRows([]); setLoading(false); return }
+    if (!fp || fp.length === 0) { setGrupos([]); setLoading(false); return }
 
+    // 2. Nombres de clientes
     const nums = fp.map(r => r.numero_formulario).filter(Boolean)
     const { data: svcs } = await supabase.from('servicios')
       .select('numero_formulario, nombre_cliente')
       .eq('cliente_id', CLIENTE_ID)
       .in('numero_formulario', nums)
-
     const clienteMap = {}
     ;(svcs || []).forEach(s => { clienteMap[s.numero_formulario] = s.nombre_cliente })
 
-    setRows(fp.map(r => ({ ...r, nombre_cliente: clienteMap[r.numero_formulario] || '—' })))
+    // 3. Cuotas detalle existentes
+    const fpIds = fp.map(r => r.id)
+    const { data: detalle } = await supabase.from('cuotas_detalle')
+      .select('*')
+      .eq('cliente_id', CLIENTE_ID)
+      .in('formas_pago_id', fpIds)
+      .order('numero_cuota', { ascending: true })
+
+    const detalleMap = {}
+    ;(detalle || []).forEach(d => {
+      if (!detalleMap[d.formas_pago_id]) detalleMap[d.formas_pago_id] = []
+      detalleMap[d.formas_pago_id].push(d)
+    })
+
+    // 4. Lazy init: insertar cuotas_detalle faltantes
+    const inserts = []
+    for (const row of fp) {
+      const existing = detalleMap[row.id] || []
+      if (existing.length === 0 && row.cuotas > 0) {
+        const montoCuota = Math.round((row.monto_cuotas || 0) / row.cuotas)
+        for (let i = 1; i <= row.cuotas; i++) {
+          inserts.push({
+            cliente_id: CLIENTE_ID,
+            formas_pago_id: row.id,
+            numero_formulario: row.numero_formulario,
+            numero_cuota: i,
+            monto: montoCuota,
+            estado: 'pendiente',
+          })
+        }
+      }
+    }
+    if (inserts.length > 0) {
+      const { data: nuevas } = await supabase.from('cuotas_detalle').insert(inserts).select()
+      ;(nuevas || []).forEach(d => {
+        if (!detalleMap[d.formas_pago_id]) detalleMap[d.formas_pago_id] = []
+        detalleMap[d.formas_pago_id].push(d)
+      })
+    }
+
+    // 5. Armar grupos
+    setGrupos(fp.map(row => ({
+      fp: row,
+      cliente: clienteMap[row.numero_formulario] || '—',
+      cuotas: (detalleMap[row.id] || []).sort((a, b) => a.numero_cuota - b.numero_cuota),
+    })))
     setLoading(false)
   }
   useEffect(() => { cargar() }, [])
 
-  const filtrados  = rows.filter(r => !filtro || r.estado === filtro)
-  const pendientes = rows.filter(r => r.estado === 'pendiente')
-  const vencidos   = rows.filter(r => r.estado === 'vencido')
-  const pagados    = rows.filter(r => r.estado === 'pagado')
+  // Todas las cuotas individuales (para KPIs y filtrado)
+  const todasCuotas = grupos.flatMap(g => g.cuotas)
+  const pendientes  = todasCuotas.filter(c => c.estado === 'pendiente')
+  const vencidas    = todasCuotas.filter(c => c.estado === 'vencido')
+  const cobradas    = todasCuotas.filter(c => c.estado === 'cobrado')
 
-  const montoPendiente = pendientes.reduce((s,r)=>s+(r.monto_cuotas||0),0)
-  const montoVencido   = vencidos.reduce((s,r)=>s+(r.monto_cuotas||0),0)
-  const montoPagado    = pagados.reduce((s,r)=>s+(r.monto_cuotas||0),0)
+  // Filtrar grupos: si hay filtro, solo mostrar grupos que tengan ≥1 cuota en ese estado
+  const gruposFiltrados = !filtro
+    ? grupos
+    : grupos.filter(g => g.cuotas.some(c => c.estado === filtro))
 
-  async function cambiarEstado(id, nuevoEstado) {
-    const { error } = await supabase.from('formas_pago').update({ estado: nuevoEstado }).eq('id', id)
+  function toggleExpandir(id) {
+    setExpandidos(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  async function cambiarEstadoCuota(cuotaId, nuevoEstado, numForm) {
+    const { error } = await supabase.from('cuotas_detalle').update({ estado: nuevoEstado }).eq('id', cuotaId)
     if (error) return
-    const cuota = rows.find(r => r.id === id)
-    setRows(prev => prev.map(r => r.id === id ? { ...r, estado: nuevoEstado } : r))
+    setGrupos(prev => prev.map(g => ({
+      ...g,
+      cuotas: g.cuotas.map(c => c.id === cuotaId ? { ...c, estado: nuevoEstado } : c),
+    })))
     await supabase.rpc('registrar_auditoria', {
       p_accion: 'actualizar', p_modulo: 'formas_pago',
-      p_descripcion: `Cuotas del formulario #${cuota?.numero_formulario} marcadas como "${nuevoEstado}"`,
-      p_referencia_id: cuota?.numero_formulario,
+      p_descripcion: `Cuota marcada como "${nuevoEstado}" (formulario #${numForm})`,
+      p_referencia_id: numForm,
     })
   }
 
   function exportar() {
-    const datos = filtrados.map(r => ({
-      'N° Formulario':  r.numero_formulario,
-      'Cliente':        r.nombre_cliente,
-      'Monto Cuotas':   r.monto_cuotas,
-      'N° Cuotas':      r.cuotas,
-      'Valor/Cuota':    r.cuotas > 0 ? Math.round(r.monto_cuotas / r.cuotas) : '',
-      'Estado':         r.estado,
-    }))
+    const datos = gruposFiltrados.flatMap(g =>
+      g.cuotas
+        .filter(c => !filtro || c.estado === filtro)
+        .map(c => ({
+          'N° Formulario': g.fp.numero_formulario,
+          'Cliente':       g.cliente,
+          'Cuota':         `${c.numero_cuota} / ${g.fp.cuotas}`,
+          'Monto':         c.monto,
+          'Estado':        c.estado,
+        }))
+    )
     exportarExcel(datos, 'Cuotas', 'Cuotas')
   }
 
   const KPI_CARDS = [
-    { icon: Clock,       label: 'Pendientes', value: pendientes.length, sub: clp(montoPendiente), gradient: 'from-amber-500 to-amber-600' },
-    { icon: XCircle,     label: 'Vencidas',   value: vencidos.length,   sub: clp(montoVencido),   gradient: 'from-red-500 to-red-600' },
-    { icon: CheckCircle, label: 'Cobradas',   value: pagados.length,    sub: clp(montoPagado),    gradient: 'from-emerald-500 to-emerald-600' },
+    { icon: Clock,       label: 'Pendientes', value: pendientes.length, sub: clp(pendientes.reduce((s,c)=>s+c.monto,0)), gradient: 'from-amber-500 to-amber-600' },
+    { icon: XCircle,     label: 'Vencidas',   value: vencidas.length,   sub: clp(vencidas.reduce((s,c)=>s+c.monto,0)),   gradient: 'from-red-500 to-red-600' },
+    { icon: CheckCircle, label: 'Cobradas',   value: cobradas.length,   sub: clp(cobradas.reduce((s,c)=>s+c.monto,0)),   gradient: 'from-emerald-500 to-emerald-600' },
   ]
 
   return (
@@ -296,77 +357,82 @@ function SeccionCuotas() {
           <option value="">Todas</option>
           <option value="pendiente">Pendientes</option>
           <option value="vencido">Vencidas</option>
-          <option value="pagado">Cobradas</option>
+          <option value="cobrado">Cobradas</option>
         </select>
         <button onClick={exportar} className="btn-excel ml-auto">
           <Download className="w-4 h-4" /> Excel
         </button>
       </div>
 
-      {loading ? <SkeletonTabla filas={5} cols={6} /> : (
+      {loading ? <SkeletonTabla filas={5} cols={5} /> : (
         <div className="tabla-panel">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
-                  {['N° Form.', 'Cliente', 'Monto Cuotas', 'N° Cuotas', 'Valor / Cuota', 'Estado', ''].map(h => (
+                  <th className="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide w-8"></th>
+                  {['N° Form.', 'Cliente', 'Total cuotas', 'Progreso'].map(h => (
                     <th key={h} className="text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
-                {filtrados.length === 0 ? (
-                  <tr><td colSpan={7} className="text-center py-10 text-slate-400">Sin cuotas registradas</td></tr>
-                ) : filtrados.map(r => {
-                  const valorCuota = r.cuotas > 0 ? Math.round((r.monto_cuotas || 0) / r.cuotas) : null
+              <tbody>
+                {gruposFiltrados.length === 0 ? (
+                  <tr><td colSpan={5} className="text-center py-10 text-slate-400">Sin cuotas registradas</td></tr>
+                ) : gruposFiltrados.map(g => {
+                  const abierto = expandidos.has(g.fp.id)
+                  const nCobradas  = g.cuotas.filter(c => c.estado === 'cobrado').length
+                  const nTotal     = g.cuotas.length
+                  const cuotasFilt = filtro ? g.cuotas.filter(c => c.estado === filtro) : g.cuotas
                   return (
-                    <tr key={r.id} className="tabla-fila">
-                      <td className="px-4 py-3 font-mono font-bold text-blue-600">#{r.numero_formulario}</td>
-                      <td className="px-4 py-3 font-medium text-slate-800">{r.nombre_cliente}</td>
-                      <td className="px-4 py-3 font-semibold text-money">{clp(r.monto_cuotas)}</td>
-                      <td className="px-4 py-3 text-slate-600 text-center">{r.cuotas || '—'}</td>
-                      <td className="px-4 py-3 text-slate-600 text-money">{valorCuota ? clp(valorCuota) : '—'}</td>
-                      <td className="px-4 py-3">
-                        <select value={r.estado} onChange={e => cambiarEstado(r.id, e.target.value)}
-                          className={`text-xs font-semibold px-2.5 py-1 rounded-full border-0 cursor-pointer ${BADGE_CUOTA[r.estado] || 'bg-slate-100 text-slate-600'}`}>
-                          <option value="pendiente">Pendiente</option>
-                          <option value="vencido">Vencida</option>
-                          <option value="pagado">Cobrada</option>
-                        </select>
-                      </td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => setHistorialItem(r)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Ver historial">
-                          <History className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
+                    <>
+                      {/* Fila cabecera del servicio */}
+                      <tr key={g.fp.id}
+                        className="tabla-fila cursor-pointer hover:bg-blue-50/40 border-b border-slate-100"
+                        onClick={() => toggleExpandir(g.fp.id)}>
+                        <td className="px-4 py-3 text-slate-400">
+                          <span className={`inline-block transition-transform duration-150 ${abierto ? 'rotate-90' : ''}`}>▶</span>
+                        </td>
+                        <td className="px-4 py-3 font-mono font-bold text-blue-600">#{g.fp.numero_formulario}</td>
+                        <td className="px-4 py-3 font-medium text-slate-800">{g.cliente}</td>
+                        <td className="px-4 py-3 font-semibold text-money">{clp(g.fp.monto_cuotas)}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 bg-slate-200 rounded-full h-1.5 min-w-[60px]">
+                              <div className="bg-emerald-500 h-1.5 rounded-full transition-all"
+                                style={{ width: nTotal > 0 ? `${Math.round((nCobradas/nTotal)*100)}%` : '0%' }} />
+                            </div>
+                            <span className="text-xs text-slate-500 whitespace-nowrap">{nCobradas}/{nTotal}</span>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Filas de cuotas individuales */}
+                      {abierto && cuotasFilt.map(c => (
+                        <tr key={c.id} className="bg-slate-50/60 border-b border-slate-100">
+                          <td className="px-4 py-2.5"></td>
+                          <td className="px-4 py-2.5 pl-8 text-slate-400 text-xs font-mono">
+                            Cuota {c.numero_cuota}/{nTotal}
+                          </td>
+                          <td className="px-4 py-2.5 text-slate-500 text-xs"></td>
+                          <td className="px-4 py-2.5 text-slate-700 text-money text-sm">{clp(c.monto)}</td>
+                          <td className="px-4 py-2.5">
+                            <select value={c.estado}
+                              onChange={e => cambiarEstadoCuota(c.id, e.target.value, g.fp.numero_formulario)}
+                              onClick={e => e.stopPropagation()}
+                              className={`text-xs font-semibold px-2.5 py-1 rounded-full border-0 cursor-pointer ${BADGE_CUOTA[c.estado] || 'bg-slate-100 text-slate-600'}`}>
+                              <option value="pendiente">Pendiente</option>
+                              <option value="vencido">Vencida</option>
+                              <option value="cobrado">Cobrada</option>
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </>
                   )
                 })}
               </tbody>
             </table>
-          </div>
-        </div>
-      )}
-
-      {historialItem && (
-        <div className="modal-backdrop">
-          <div className="modal-panel w-full max-w-lg">
-            <div className="p-5">
-              <div className="flex items-center justify-between mb-5">
-                <div>
-                  <h3 className="font-bold text-slate-900">Historial del formulario</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">#{historialItem.numero_formulario}</p>
-                </div>
-                <button onClick={() => setHistorialItem(null)}
-                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="max-h-[60vh] overflow-y-auto">
-                <HistorialAuditoria referenciaId={historialItem.numero_formulario} modulos={['formas_pago']} />
-              </div>
-            </div>
           </div>
         </div>
       )}
