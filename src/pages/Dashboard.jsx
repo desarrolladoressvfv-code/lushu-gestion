@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react'
 import { supabase, CLIENTE_ID, clp } from '../lib/supabase'
 import { hoyCL } from '../lib/fecha'
-import { ClipboardList, DollarSign, AlertTriangle, CheckSquare, Package, ShoppingCart, TrendingUp, Users, ArrowRight, Building2, Calendar, ChevronDown } from 'lucide-react'
+import {
+  ClipboardList, DollarSign, CheckSquare, Package, ShoppingCart,
+  TrendingUp, ArrowRight, Calendar, ChevronDown,
+  CreditCard, Award, Archive, Banknote,
+} from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { SkeletonKPI, SkeletonTabla } from '../components/SkeletonLoader'
 import {
@@ -14,14 +18,16 @@ const PERIODOS = ['Diario', 'Semanal', 'Mensual']
 const COLORES_PIE = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444']
 
 const KPI_CONFIG = [
-  { key: 'servicios',        label: 'Servicios',           icon: ClipboardList, ruta: '/servicios',  gradiente: 'from-blue-500 to-blue-700',       sombra: 'shadow-blue-500/30' },
-  { key: 'ventas',           label: 'Ventas',              icon: DollarSign,    ruta: '/ventas',      gradiente: 'from-emerald-500 to-emerald-700', sombra: 'shadow-emerald-500/30', dinero: true },
-  { key: 'pagoPendiente',    label: 'Cobros pendientes',   icon: AlertTriangle, ruta: '/formas-pago', gradiente: 'from-amber-500 to-orange-600',    sombra: 'shadow-amber-500/30',  dinero: true },
-  { key: 'chequesPorVencer', label: 'Cheques por vencer',  icon: CheckSquare,   ruta: '/cheques',     gradiente: 'from-red-500 to-red-700',         sombra: 'shadow-red-500/30',    sub: 'Próximos 7 días' },
-  { key: 'stockBajo',        label: 'Productos stock bajo',icon: Package,       ruta: '/inventario',  gradiente: 'from-orange-500 to-orange-700',   sombra: 'shadow-orange-500/30' },
-  { key: 'ocPendientes',     label: 'OC pendientes',       icon: ShoppingCart,  ruta: '/compras',     gradiente: 'from-violet-500 to-violet-700',   sombra: 'shadow-violet-500/30' },
-  { key: 'fallecidos',       label: 'Fallecidos',          icon: Users,         ruta: '/fallecidos',  gradiente: 'from-slate-500 to-slate-700',     sombra: 'shadow-slate-500/30' },
-  { key: 'totalAnual',       label: 'Total año',           icon: TrendingUp,    ruta: '/servicios',   gradiente: 'from-cyan-500 to-cyan-700',       sombra: 'shadow-cyan-500/30' },
+  { key: 'servicios',       label: 'Servicios',           icon: ClipboardList, ruta: '/servicios',   gradiente: 'from-blue-500 to-blue-700',       sombra: 'shadow-blue-500/30' },
+  { key: 'ventas',          label: 'Ventas',              icon: DollarSign,    ruta: '/ventas',       gradiente: 'from-emerald-500 to-emerald-700', sombra: 'shadow-emerald-500/30', dinero: true },
+  { key: 'cheques',         label: 'Cheques por cobrar',  icon: CheckSquare,   ruta: '/cheques',      gradiente: 'from-red-500 to-red-700',         sombra: 'shadow-red-500/30',    sub: 'Próximos 7 días' },
+  { key: 'cuotasPorCobrar', label: 'Cuotas por cobrar',  icon: CreditCard,    ruta: '/formas-pago',  gradiente: 'from-amber-500 to-orange-600',    sombra: 'shadow-amber-500/30',  dinero: true },
+  { key: 'ocPendientes',    label: 'OC pendientes',       icon: ShoppingCart,  ruta: '/compras',      gradiente: 'from-violet-500 to-violet-700',   sombra: 'shadow-violet-500/30' },
+  { key: 'ticketPromedio',  label: 'Ticket promedio',     icon: TrendingUp,    ruta: '/ventas',       gradiente: 'from-cyan-500 to-cyan-700',       sombra: 'shadow-cyan-500/30',   dinero: true },
+  { key: 'urnaTop',         label: 'Urna más vendida',    icon: Award,         ruta: '/ventas',       gradiente: 'from-pink-500 to-rose-600',       sombra: 'shadow-pink-500/30',   texto: true },
+  { key: 'stockMinimo',     label: 'Stock mínimo',        icon: Package,       ruta: '/inventario',   gradiente: 'from-orange-500 to-orange-700',   sombra: 'shadow-orange-500/30' },
+  { key: 'stockTotal',      label: 'Productos en stock',  icon: Archive,       ruta: '/inventario',   gradiente: 'from-teal-500 to-teal-700',       sombra: 'shadow-teal-500/30',   sub: 'unidades totales' },
+  { key: 'valorInventario', label: 'Valor inventario',    icon: Banknote,      ruta: '/inventario',   gradiente: 'from-indigo-500 to-indigo-700',   sombra: 'shadow-indigo-500/30', dinero: true },
 ]
 
 function getWeek(d) {
@@ -76,7 +82,7 @@ export default function Dashboard() {
   const [sucursales, setSucursales]         = useState([])
   const [sucursalFiltro, setSucursalFiltro] = useState('')
   const [añoFiltro, setAñoFiltro]           = useState(añoActual)
-  const [mesFiltro, setMesFiltro]           = useState('')   // '' = año completo
+  const [mesFiltro, setMesFiltro]           = useState('')
   const [añoCreacion, setAñoCreacion]       = useState(añoActual)
   const [dropdownAbierto, setDropdownAbierto] = useState(false)
 
@@ -88,13 +94,11 @@ export default function Dashboard() {
   const [stockBajoItems, setStockBajoItems]     = useState([])
   const [loading, setLoading]                   = useState(true)
 
-  // Años disponibles (desde creación hasta hoy)
   const años = Array.from(
     { length: añoActual - añoCreacion + 1 },
     (_, i) => añoCreacion + i
   )
 
-  // Carga inicial: sucursales + año de creación del cliente
   useEffect(() => {
     supabase.from('sucursales').select('id,nombre')
       .eq('cliente_id', CLIENTE_ID).eq('activo', true).order('nombre')
@@ -103,20 +107,16 @@ export default function Dashboard() {
     supabase.from('clientes').select('created_at')
       .eq('id', CLIENTE_ID).single()
       .then(({ data }) => {
-        if (data?.created_at) {
-          setAñoCreacion(new Date(data.created_at).getFullYear())
-        }
+        if (data?.created_at) setAñoCreacion(new Date(data.created_at).getFullYear())
       })
   }, [])
 
-  // Carga principal
   useEffect(() => {
     let cancelado = false
 
     async function cargar() {
       setLoading(true)
 
-      // ── Rango del período seleccionado ───────────────────
       let desdeQuery, hastaQuery
       if (mesFiltro) {
         const m         = parseInt(mesFiltro)
@@ -128,10 +128,6 @@ export default function Dashboard() {
         hastaQuery = `${añoFiltro}-12-31`
       }
 
-      // Total anual siempre usa el año completo
-      const desdeAnual = `${añoFiltro}-01-01`
-      const hastaAnual = `${añoFiltro}-12-31`
-
       const en7dDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))
       en7dDate.setDate(en7dDate.getDate() + 7)
       const en7d = en7dDate.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' })
@@ -139,8 +135,6 @@ export default function Dashboard() {
       const filtroSuc = sucursalFiltro
       const conFiltro = (q) => filtroSuc ? q.eq('sucursal_id', filtroSuc) : q
 
-      // Pre-obtener formularios de la sucursal (sin filtro de fecha) para
-      // métricas de estado actual (cobros pendientes, cheques)
       let formulariosSuc = null
       if (filtroSuc) {
         const { data: svcAll } = await supabase
@@ -164,8 +158,6 @@ export default function Dashboard() {
         { data: inventario },
         { data: ultimosSvc },
         { data: ocPendientes },
-        { data: fallecidosData },
-        { data: totalAnualData },
       ] = await Promise.all([
         conFiltro(supabase.from('servicios').select('id')
           .eq('cliente_id', CLIENTE_ID)
@@ -176,7 +168,7 @@ export default function Dashboard() {
           .gte('fecha_servicio', desdeQuery).lte('fecha_servicio', hastaQuery)),
 
         conFiltroFormSuc(supabase.from('formas_pago')
-          .select('saldo_pendiente, efectivo, tarjeta, valor_convenio, valor_cheques, monto_cuotas')
+          .select('saldo_pendiente, efectivo, tarjeta, valor_convenio, valor_cheques, monto_cuotas, estado')
           .eq('cliente_id', CLIENTE_ID)),
 
         conFiltroFormSuc(supabase.from('cheques')
@@ -184,7 +176,7 @@ export default function Dashboard() {
           .eq('cliente_id', CLIENTE_ID).eq('estado', 'vigente').lte('vencimiento', en7d)),
 
         conFiltro(supabase.from('inventario')
-          .select('stock_actual, stock_minimo, producto_id, sucursal_id, productos(nombre), sucursales(nombre)')
+          .select('stock_actual, stock_minimo, producto_id, sucursal_id, productos(nombre, precio), sucursales(nombre)')
           .eq('cliente_id', CLIENTE_ID)),
 
         conFiltro(supabase.from('servicios')
@@ -195,44 +187,54 @@ export default function Dashboard() {
 
         conFiltro(supabase.from('ordenes_compra').select('id')
           .eq('cliente_id', CLIENTE_ID).eq('estado', 'pendiente')),
-
-        conFiltroFormSuc(supabase.from('fallecidos').select('id')
-          .eq('cliente_id', CLIENTE_ID)
-          .gte('fecha_servicio', desdeQuery).lte('fecha_servicio', hastaQuery)),
-
-        conFiltro(supabase.from('servicios').select('id')
-          .eq('cliente_id', CLIENTE_ID)
-          .gte('fecha_servicio', desdeAnual).lte('fecha_servicio', hastaAnual)),
       ])
 
       if (cancelado) return
 
-      const totalVentas    = (todasVentas || []).reduce((s, v) => s + (v.venta_total || 0), 0)
-      const totalPendiente = (pagos || []).filter(p => (p.saldo_pendiente || 0) > 0).length
-      const bajo           = (inventario || []).filter(i => i.stock_actual <= i.stock_minimo)
+      const totalVentas     = (todasVentas || []).reduce((s, v) => s + (v.venta_total || 0), 0)
+      const countServicios  = serviciosData?.length || 0
+      const bajo            = (inventario || []).filter(i => i.stock_actual <= i.stock_minimo)
+      const stockTotal      = (inventario || []).reduce((s, i) => s + (i.stock_actual || 0), 0)
+      const valorInventario = (inventario || []).reduce((s, i) => s + ((i.stock_actual || 0) * (i.productos?.precio || 0)), 0)
+
+      // Cuotas por cobrar: solo formas_pago con monto_cuotas > 0 y estado distinto de 'pagado'
+      const cuotasPorCobrar = (pagos || [])
+        .filter(p => (p.monto_cuotas || 0) > 0 && p.estado !== 'pagado')
+        .reduce((s, p) => s + (p.monto_cuotas || 0), 0)
+
+      // Ticket promedio del período
+      const ticketPromedio = countServicios > 0 ? Math.round(totalVentas / countServicios) : 0
+
+      // Urna más vendida del período
+      const conteo = {}
+      ;(todasVentas || []).forEach(v => {
+        const n = v.productos?.nombre || null
+        if (!n) return
+        conteo[n] = (conteo[n] || 0) + 1
+      })
+      const productosOrdenados = Object.entries(conteo)
+        .map(([nombre, cantidad]) => ({ nombre, cantidad }))
+        .sort((a, b) => b.cantidad - a.cantidad)
+      const urnaTop = productosOrdenados[0]?.nombre || '—'
 
       setKpis({
-        servicios:        serviciosData?.length  || 0,
-        ventas:           totalVentas,
-        pagoPendiente:    totalPendiente,
-        chequesPorVencer: cheques?.length        || 0,
-        stockBajo:        bajo.length,
-        ocPendientes:     ocPendientes?.length   || 0,
-        fallecidos:       fallecidosData?.length || 0,
-        totalAnual:       totalAnualData?.length || 0,
+        servicios:       countServicios,
+        ventas:          totalVentas,
+        cheques:         cheques?.length        || 0,
+        cuotasPorCobrar: cuotasPorCobrar,
+        ocPendientes:    ocPendientes?.length   || 0,
+        ticketPromedio:  ticketPromedio,
+        urnaTop:         urnaTop,
+        stockMinimo:     bajo.length,
+        stockTotal:      stockTotal,
+        valorInventario: valorInventario,
       })
 
       setVentasData(agruparVentas(todasVentas || [], periodo))
-
-      const conteo = {}
-      ;(todasVentas || []).forEach(v => {
-        const n = v.productos?.nombre || 'Sin urna'
-        conteo[n] = (conteo[n] || 0) + 1
-      })
       setProductosData(
-        Object.entries(conteo)
-          .map(([nombre, cantidad]) => ({ nombre: nombre.split(' ').slice(0, 2).join(' '), cantidad }))
-          .sort((a, b) => b.cantidad - a.cantidad).slice(0, 6)
+        productosOrdenados
+          .map(({ nombre, cantidad }) => ({ nombre: nombre.split(' ').slice(0, 2).join(' '), cantidad }))
+          .slice(0, 6)
       )
 
       const ef = (pagos || []).reduce((s, p) => s + (p.efectivo       || 0), 0)
@@ -260,6 +262,7 @@ export default function Dashboard() {
   const formatKpiValue = (cfg) => {
     if (!kpis) return '—'
     const v = kpis[cfg.key]
+    if (cfg.texto) return v
     return cfg.dinero ? clp(v) : v
   }
 
@@ -288,7 +291,6 @@ export default function Dashboard() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Filtro sucursal */}
           {sucursales.length > 0 && (
             <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
               <button onClick={() => setSucursalFiltro('')}
@@ -308,7 +310,6 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Filtro período (dropdown) */}
           <div className="relative">
             <button
               onClick={() => setDropdownAbierto(v => !v)}
@@ -320,13 +321,8 @@ export default function Dashboard() {
 
             {dropdownAbierto && (
               <>
-                {/* Backdrop */}
                 <div className="fixed inset-0 z-40" onClick={() => setDropdownAbierto(false)} />
-
-                {/* Panel */}
                 <div className="absolute right-0 top-full mt-2 z-50 bg-white rounded-2xl shadow-xl border border-slate-100 p-4 w-72">
-
-                  {/* Años */}
                   <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Año</p>
                   <div className="flex gap-1.5 flex-wrap mb-4">
                     {años.map(a => (
@@ -342,10 +338,8 @@ export default function Dashboard() {
                     ))}
                   </div>
 
-                  {/* Meses */}
                   <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Período</p>
                   <div className="grid grid-cols-4 gap-1.5">
-                    {/* Año completo */}
                     <button
                       onClick={() => { setMesFiltro(''); setDropdownAbierto(false) }}
                       className={`col-span-4 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
@@ -378,21 +372,23 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── KPIs ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      {/* ── KPIs (10 cards: 2 filas × 5 columnas) ───────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         {KPI_CONFIG.map((cfg, i) =>
           loading ? <SkeletonKPI key={cfg.key} /> : (
             <button key={cfg.key} onClick={() => navigate(cfg.ruta)}
               className={`kpi-card bg-gradient-to-br ${cfg.gradiente} shadow-lg ${cfg.sombra} text-left fade-in-up`}
-              style={{ animationDelay: `${i * 0.06}s` }}>
+              style={{ animationDelay: `${i * 0.05}s` }}>
               <div className="flex items-start justify-between mb-3">
-                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                  <cfg.icon className="w-5 h-5 text-white" />
+                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
+                  <cfg.icon className="w-4 h-4 text-white" />
                 </div>
                 <ArrowRight className="w-4 h-4 text-white/50" />
               </div>
               <p className="text-white/70 text-xs font-medium mb-1 truncate">{cfg.label}</p>
-              <p className="text-white text-xl sm:text-2xl font-bold truncate">{formatKpiValue(cfg)}</p>
+              <p className={`text-white font-bold truncate ${cfg.texto ? 'text-sm leading-tight' : 'text-xl sm:text-2xl'}`}>
+                {formatKpiValue(cfg)}
+              </p>
               {cfg.sub && <p className="text-white/60 text-xs mt-0.5">{cfg.sub}</p>}
             </button>
           )
