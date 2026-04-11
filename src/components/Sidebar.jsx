@@ -76,16 +76,6 @@ function ModalInfoPlan({ plan, planInfo, clienteId, vencimiento, onClose }) {
     return new Date(iso).toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' })
   }
 
-  function calcularProximoPago(createdAt) {
-    if (!createdAt) return '—'
-    const inicio = new Date(createdAt)
-    const hoy    = new Date()
-    const dia    = inicio.getDate()
-    let prox = new Date(hoy.getFullYear(), hoy.getMonth(), dia)
-    if (prox <= hoy) prox = new Date(hoy.getFullYear(), hoy.getMonth() + 1, dia)
-    return prox.toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' })
-  }
-
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
@@ -132,7 +122,7 @@ function ModalInfoPlan({ plan, planInfo, clienteId, vencimiento, onClose }) {
               <div>
                 <p className="text-xs text-slate-400">Próximo pago</p>
                 <p className="text-sm font-bold text-blue-600">
-                  {createdAt ? calcularProximoPago(createdAt) : <span className="text-slate-300">Cargando...</span>}
+                  {vencimiento ? formatFecha(vencimiento) : '—'}
                 </p>
               </div>
             </div>
@@ -267,20 +257,14 @@ export default function Sidebar({ onClose }) {
   )
 
   useEffect(() => {
-    if (esOperador || !perfil?.cliente_id) return
-    supabase.from('clientes').select('created_at').eq('id', perfil.cliente_id).single()
-      .then(({ data }) => {
-        if (!data?.created_at) return
-        const inicio = new Date(data.created_at)
-        const hoy    = new Date()
-        const dia    = inicio.getDate()
-        let prox = new Date(hoy.getFullYear(), hoy.getMonth(), dia)
-        if (prox <= hoy) prox = new Date(hoy.getFullYear(), hoy.getMonth() + 1, dia)
-        const diff = Math.ceil((prox - hoy) / (1000 * 60 * 60 * 24))
-        setDiasPago(diff)
-        if (diff <= 5) setAlertaPago(true)
-      })
-  }, [perfil?.cliente_id, esOperador])
+    if (esOperador || !perfil?.clienteVencimiento) return
+    const venc = new Date(perfil.clienteVencimiento)
+    const hoy  = new Date()
+    hoy.setHours(0, 0, 0, 0)
+    const diff = Math.ceil((venc - hoy) / (1000 * 60 * 60 * 24))
+    setDiasPago(diff)
+    if (diff <= 5) setAlertaPago(true)
+  }, [perfil?.clienteVencimiento, esOperador])
 
   function dismissAlertaPago() {
     sessionStorage.setItem(dismissKey, 'true')
