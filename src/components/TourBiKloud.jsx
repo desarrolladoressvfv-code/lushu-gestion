@@ -89,17 +89,17 @@ function buildSteps(esPro) {
     {
       id: 'nav-dashboard',
       title: '📊 Dashboard',
-      desc: 'Aquí tienes una visión general de tu negocio en tiempo real: servicios activos, ingresos del mes y alertas importantes.',
+      desc: 'Visión general de tu negocio en tiempo real: 10 indicadores clave como servicios del mes, ventas, cuotas por cobrar, ticket promedio, urna más vendida, valor de inventario y más.',
     },
     esPro && {
       id: 'chatbot-fab',
       title: '✨ Luchus — Tu asistente IA',
-      desc: 'Pregúntale cualquier cosa sobre tus datos: "¿Cuántos servicios tuve este mes?" o "¿Qué productos están por vencer?"',
+      desc: 'Pregúntale cualquier cosa sobre tus datos: "¿Cuánto vendí este mes?", "¿Qué productos tienen stock crítico?" o "¿Qué cheques vencen esta semana?"',
     },
     {
       id: 'nav-formulario',
       title: '📋 Nuevo Servicio',
-      desc: 'Registra cada servicio funerario desde aquí. Datos del fallecido, convenio, productos y responsable del servicio.',
+      desc: 'Registra cada servicio funerario: datos del fallecido, convenio, urna, formas de pago (efectivo, tarjeta, cuotas o cheque) con formato de miles automático e IVA configurable.',
     },
     esPro && {
       id: 'nav-cotizacion',
@@ -109,7 +109,7 @@ function buildSteps(esPro) {
     {
       id: 'nav-servicios',
       title: '🗂️ Servicios',
-      desc: 'Consulta y filtra el historial completo de servicios. Busca por fecha, estado, convenio o nombre del fallecido.',
+      desc: 'Historial completo de servicios. Busca por fecha, estado, convenio o nombre del fallecido. Los campos críticos como la urna quedan protegidos para mantener la integridad del registro.',
     },
     {
       id: 'nav-fallecidos',
@@ -128,8 +128,8 @@ function buildSteps(esPro) {
     },
     esPro && {
       id: 'nav-cheques',
-      title: '🔖 Cheques',
-      desc: 'Gestiona y monitorea tus cheques vigentes, cobrados y por vencer. Alertas antes del vencimiento.',
+      title: '🔖 Cuentas por cobrar',
+      desc: 'Gestiona cheques y cuotas en un solo lugar. Cada cuota se registra de forma individual para hacer seguimiento por cuota: pendiente, vencida o cobrada. Alertas antes del vencimiento.',
     },
     {
       id: 'nav-inventario',
@@ -144,7 +144,12 @@ function buildSteps(esPro) {
     esPro && {
       id: 'nav-compras',
       title: '🛒 Órdenes de Compra',
-      desc: 'Gestiona tus compras a proveedores desde aquí. Crea órdenes, recibe mercadería y controla costos.',
+      desc: 'Gestiona tus compras a proveedores. Crea órdenes, recibe mercadería y controla costos.',
+    },
+    {
+      id: 'nav-configuracion',
+      title: '⚙️ Configuración',
+      desc: 'Personaliza tu cuenta: datos de la empresa, sucursales, usuarios, tasa de IVA, cambio de contraseña y revisión del historial de auditoría.',
     },
   ].filter(Boolean)
 

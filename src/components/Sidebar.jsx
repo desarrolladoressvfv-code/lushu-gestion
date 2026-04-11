@@ -290,7 +290,7 @@ export default function Sidebar({ onClose }) {
           <p className="text-xs text-slate-500 px-3 mb-2 truncate">{perfil.nombre}</p>
         )}
         {!esOperador && (
-          <NavItem to="/configuracion" icon={Settings} label="Configuración" onClick={onClose} />
+          <NavItem to="/configuracion" icon={Settings} label="Configuración" onClick={onClose} tourId="nav-configuracion" />
         )}
         <button
           onClick={logout}
