@@ -385,7 +385,7 @@ export default function SuperAdminClientes() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
               <tr>
-                {['Empresa', 'RUT', 'Contacto', 'Tipo de Plan', 'USD/mes', 'Sucursales', 'Cambio plan', 'Vencimiento', 'Estado', 'Acciones'].map(h => (
+                {['Empresa', 'RUT', 'Contacto', 'Tipo de Plan', 'USD/mes', 'Sucursales', 'Cambio plan', 'Vencimiento', 'Próx. Pago', 'Estado', 'Acciones'].map(h => (
                   <th key={h} className="bg-slate-50 text-left px-4 py-3 font-semibold text-slate-500 text-xs uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -409,6 +409,18 @@ export default function SuperAdminClientes() {
                   const d = new Date(c.ultimo_cambio_plan)
                   ultimoCambioStr = d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: '2-digit' })
                 }
+
+                // Calcular próximo pago (mismo día del mes que created_at, mes siguiente si ya pasó)
+                function proximoPago(createdAt) {
+                  if (!createdAt) return '—'
+                  const inicio = new Date(createdAt)
+                  const hoy2   = new Date()
+                  const dia    = inicio.getDate()
+                  let prox = new Date(hoy2.getFullYear(), hoy2.getMonth(), dia)
+                  if (prox <= hoy2) prox = new Date(hoy2.getFullYear(), hoy2.getMonth() + 1, dia)
+                  return prox.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                }
+                const proxPago = proximoPago(c.created_at)
 
                 return (
                   <tr key={c.id} className={`tabla-fila ${!activo ? 'opacity-60' : ''}`}>
@@ -448,6 +460,11 @@ export default function SuperAdminClientes() {
                         <p className="text-xs text-amber-500">{diasVence}d restantes</p>
                       )}
                       {vencido && <p className="text-xs text-red-500">Vencida</p>}
+                    </td>
+
+                    {/* Próximo pago */}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm font-semibold text-blue-600">{proxPago}</span>
                     </td>
 
                     <td className="px-4 py-3">

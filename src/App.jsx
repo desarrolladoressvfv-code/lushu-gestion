@@ -11,6 +11,7 @@ import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard'
 import SuperAdminClientes from './pages/superadmin/SuperAdminClientes'
 import Dashboard from './pages/Dashboard'
 import FormularioNuevo from './pages/FormularioNuevo'
+import FormularioEditar from './pages/FormularioEditar'
 import Cotizacion from './pages/Cotizacion'
 import Servicios from './pages/Servicios'
 import Ventas from './pages/Ventas'
@@ -103,6 +104,18 @@ function AccesoBloqueado({ logout, razon }) {
   )
 }
 
+/* ── RutaProtegida — definida FUERA de AppRouter para que React
+     no la trate como un tipo de componente nuevo en cada render ── */
+function RutaProtegida({ modulo, elemento, soloAdmin = false, esOperador, modulos }) {
+  function puedeAcceder(m) {
+    if (!esOperador) return true
+    return (modulos || []).includes(m)
+  }
+  if (soloAdmin && esOperador) return <AccesoDenegado />
+  if (modulo && !puedeAcceder(modulo)) return <AccesoDenegado />
+  return elemento
+}
+
 /* ── Router principal ───────────────────────────────────── */
 function AppRouter() {
   const { session, perfil, cargando, esSuperAdmin, clienteActivo, logout, completarOnboarding } = useAuth()
@@ -144,20 +157,6 @@ function AppRouter() {
   const esOperador = perfil?.rol === 'operador'
   const modulos    = perfil?.modulosPermitidos || []
 
-  // Helper: verifica si el operador tiene acceso a un módulo
-  // Admin siempre tiene acceso a todo
-  function puedeAcceder(modulo) {
-    if (!esOperador) return true
-    return modulos.includes(modulo)
-  }
-
-  // Elemento de ruta con control de acceso por módulo
-  function RutaProtegida({ modulo, elemento, soloAdmin = false }) {
-    if (soloAdmin && esOperador) return <AccesoDenegado />
-    if (modulo && !puedeAcceder(modulo)) return <AccesoDenegado />
-    return elemento
-  }
-
   // Determinar si mostrar bienvenida:
   // fase 'bienvenida' explícita (ej: repetir tour desde config)
   // O nunca hizo onboarding y el tour aún no fue iniciado
@@ -182,6 +181,9 @@ function AppRouter() {
     setFase(null)
   }
 
+  // Props comunes de acceso pasadas explícitamente a RutaProtegida
+  const rp = { esOperador, modulos }
+
   return (
     <BrowserRouter>
       <EmpresaProvider>
@@ -197,20 +199,26 @@ function AppRouter() {
         {/* ── Layout principal ─────────────────────────────── */}
         <Layout>
           <Routes>
-            <Route path="/"              element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard"     element={<Dashboard />} />
-            <Route path="/formulario"    element={<RutaProtegida modulo="formulario"  elemento={<FormularioNuevo />} />} />
-            <Route path="/cotizacion"    element={<RutaProtegida modulo="cotizacion"  elemento={esPro ? <Cotizacion /> : <PaginaUpgrade modulo="Cotización" />} />} />
-            <Route path="/servicios"     element={<RutaProtegida modulo="servicios"   elemento={<Servicios />} />} />
-            <Route path="/ventas"        element={<RutaProtegida modulo="ventas"      elemento={esPro ? <Ventas /> : <PaginaUpgrade modulo="Ventas" />} soloAdmin />} />
-            <Route path="/formas-pago"   element={<RutaProtegida modulo="formas_pago" elemento={esPro ? <FormasPago /> : <PaginaUpgrade modulo="Formas de Pago" />} />} />
-            <Route path="/cheques"       element={<RutaProtegida modulo="cheques"     elemento={esPro ? <Cheques /> : <PaginaUpgrade modulo="Cheques" />} soloAdmin />} />
-            <Route path="/fallecidos"    element={<RutaProtegida modulo="fallecidos"  elemento={<Fallecidos />} />} />
-            <Route path="/inventario"    element={<RutaProtegida modulo="inventario"  elemento={<Inventario />} />} />
-            <Route path="/movimientos"   element={<RutaProtegida modulo="movimientos" elemento={esPro ? <MovimientosInventario /> : <PaginaUpgrade modulo="Movimientos de Inventario" />} />} />
-            <Route path="/compras"       element={<RutaProtegida modulo="compras"     elemento={esPro ? <Compras /> : <PaginaUpgrade modulo="Órdenes de Compra" />} />} />
-            <Route path="/recepcion"     element={<RutaProtegida modulo="recepcion"   elemento={esPro ? <RecepcionMercaderia /> : <PaginaUpgrade modulo="Recepción de Mercadería" />} />} />
-            <Route path="/configuracion" element={<RutaProtegida soloAdmin           elemento={<Configuracion />} />} />
+            <Route path="/" element={(() => {
+              if (!esOperador) return <Navigate to="/dashboard" replace />
+              const RUTAS = { dashboard: '/dashboard', formulario: '/formulario', servicios: '/servicios', fallecidos: '/fallecidos', formas_pago: '/formas-pago', inventario: '/inventario', movimientos: '/movimientos', compras: '/compras', recepcion: '/recepcion' }
+              const primera = modulos.find(m => RUTAS[m])
+              return <Navigate to={primera ? RUTAS[primera] : '/dashboard'} replace />
+            })()} />
+            <Route path="/dashboard"     element={<RutaProtegida {...rp} modulo="dashboard" elemento={<Dashboard />} />} />
+            <Route path="/formulario"          element={<RutaProtegida {...rp} modulo="formulario" elemento={<FormularioNuevo />} />} />
+            <Route path="/formulario/editar/:id" element={<RutaProtegida {...rp} modulo="formulario" elemento={<FormularioEditar />} />} />
+            <Route path="/cotizacion"    element={<RutaProtegida {...rp} modulo="cotizacion"  elemento={esPro ? <Cotizacion /> : <PaginaUpgrade modulo="Cotización" />} />} />
+            <Route path="/servicios"     element={<RutaProtegida {...rp} modulo="servicios"   elemento={<Servicios />} />} />
+            <Route path="/ventas"        element={<RutaProtegida {...rp} modulo="ventas"      elemento={esPro ? <Ventas /> : <PaginaUpgrade modulo="Ventas" />} soloAdmin />} />
+            <Route path="/formas-pago"   element={<RutaProtegida {...rp} modulo="formas_pago" elemento={esPro ? <FormasPago /> : <PaginaUpgrade modulo="Formas de Pago" />} />} />
+            <Route path="/cheques"       element={<RutaProtegida {...rp} modulo="cheques"     elemento={esPro ? <Cheques /> : <PaginaUpgrade modulo="Cheques" />} soloAdmin />} />
+            <Route path="/fallecidos"    element={<RutaProtegida {...rp} modulo="fallecidos"  elemento={<Fallecidos />} />} />
+            <Route path="/inventario"    element={<RutaProtegida {...rp} modulo="inventario"  elemento={<Inventario />} />} />
+            <Route path="/movimientos"   element={<RutaProtegida {...rp} modulo="movimientos" elemento={esPro ? <MovimientosInventario /> : <PaginaUpgrade modulo="Movimientos de Inventario" />} />} />
+            <Route path="/compras"       element={<RutaProtegida {...rp} modulo="compras"     elemento={esPro ? <Compras /> : <PaginaUpgrade modulo="Órdenes de Compra" />} />} />
+            <Route path="/recepcion"     element={<RutaProtegida {...rp} modulo="recepcion"   elemento={esPro ? <RecepcionMercaderia /> : <PaginaUpgrade modulo="Recepción de Mercadería" />} />} />
+            <Route path="/configuracion" element={<RutaProtegida {...rp} soloAdmin           elemento={<Configuracion />} />} />
             <Route path="*"              element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Layout>

@@ -14,7 +14,7 @@ export default function Fallecidos() {
 
   useEffect(() => {
     supabase.from('fallecidos').select('*').eq('cliente_id', CLIENTE_ID)
-      .order('fecha_servicio', { ascending: false })
+      .order('numero_formulario', { ascending: false })
       .then(({ data }) => { setRows(data || []); setLoading(false) })
   }, [])
 

@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase, CLIENTE_ID } from '../lib/supabase'
 import {
   AlertTriangle, Download, Package, CheckCircle,
-  XCircle, TrendingDown, DollarSign, Pencil, Check, X,
+  XCircle, TrendingDown, DollarSign, Pencil, Check, X, History,
 } from 'lucide-react'
 import { exportarExcel } from '../lib/exportExcel'
 import { SkeletonTabla } from '../components/SkeletonLoader'
+import HistorialAuditoria from '../components/HistorialAuditoria'
 
 /* ── Toast ─────────────────────────────────────────────── */
 function Toast({ mensaje, tipo, onClose }) {
@@ -95,6 +96,7 @@ export default function Inventario() {
   // B8: persiste el filtro en sessionStorage para que no se pierda al navegar
   const [filtroSucursal,setFiltroSucursal]= useState(() => sessionStorage.getItem('inv_sucursal') || '')
   const [toast,         setToast]         = useState(null)
+  const [historialItem, setHistorialItem] = useState(null)
 
   async function cargar() {
     const [{ data: inv }, { data: suc }] = await Promise.all([
@@ -132,6 +134,7 @@ export default function Inventario() {
         p_accion: 'editar',
         p_modulo: 'inventario',
         p_descripcion: `Stock mínimo de "${prod?.productos?.nombre || id}" actualizado a ${nuevoMinimo}`,
+        p_referencia_id: id,
       })
     } else {
       setToast({ mensaje: 'Error al actualizar el stock mínimo', tipo: 'error' })
@@ -211,6 +214,7 @@ export default function Inventario() {
   }
 
   return (
+    <>
     <div className="space-y-4 page-enter">
 
       {/* Header */}
@@ -333,6 +337,13 @@ export default function Inventario() {
                       ? <span className="badge badge-amber">Stock Bajo</span>
                       : <span className="badge badge-green">Normal</span>}
                   </td>
+                  <td className="px-4 py-3 text-center">
+                    <button onClick={() => setHistorialItem(r)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                      title="Ver historial">
+                      <History className="w-4 h-4" />
+                    </button>
+                  </td>
 
                 </tr>
               ))}
@@ -351,5 +362,28 @@ export default function Inventario() {
       )}
 
     </div>
+
+    {historialItem && (
+      <div className="modal-backdrop">
+        <div className="modal-panel w-full max-w-lg">
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="font-bold text-slate-900">Historial de inventario</h3>
+                <p className="text-xs text-slate-400 mt-0.5">{historialItem.productos?.nombre}</p>
+              </div>
+              <button onClick={() => setHistorialItem(null)}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto">
+              <HistorialAuditoria referenciaId={historialItem.id} modulos={['inventario']} />
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+  </>
   )
 }

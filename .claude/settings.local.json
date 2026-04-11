@@ -52,7 +52,8 @@
       "Bash(powershell -Command \"Select-String -Path ''C:\\\\Users\\\\yoga\\\\Desktop\\\\Urnas\\\\src\\\\context\\\\AuthContext.jsx'' -Pattern ''usuario|user_id|email'' | Select-Object LineNumber, Line | Format-Table -AutoSize\")",
       "Bash(powershell -Command \"Select-String -Path ''C:\\\\Users\\\\yoga\\\\Desktop\\\\Urnas\\\\src\\\\pages\\\\Cheques.jsx'' -Pattern ''clp\\\\\\(|monto|valor'' | Select-Object LineNumber, Line | Format-Table -AutoSize\")",
       "Bash(powershell -Command \"Set-Location ''C:\\\\Users\\\\yoga\\\\Desktop\\\\Urnas''; git diff --stat HEAD\")",
-      "Bash(powershell -Command \"Set-Location ''C:\\\\Users\\\\yoga\\\\Desktop\\\\Urnas''; git add src/pages/Cheques.jsx src/pages/Compras.jsx src/pages/Cotizacion.jsx src/pages/Dashboard.jsx src/pages/FormasPago.jsx src/pages/FormularioNuevo.jsx src/pages/Servicios.jsx src/pages/Ventas.jsx\")"
+      "Bash(powershell -Command \"Set-Location ''C:\\\\Users\\\\yoga\\\\Desktop\\\\Urnas''; git add src/pages/Cheques.jsx src/pages/Compras.jsx src/pages/Cotizacion.jsx src/pages/Dashboard.jsx src/pages/FormasPago.jsx src/pages/FormularioNuevo.jsx src/pages/Servicios.jsx src/pages/Ventas.jsx\")",
+      "Bash(powershell -Command \"New-Item -ItemType Directory -Force -Path ''C:\\\\Users\\\\yoga\\\\Desktop\\\\Urnas\\\\landing'' | Out-Null; \\(Get-Content ''C:\\\\Users\\\\yoga\\\\Desktop\\\\Urnas\\\\landing\\\\index.html'' -ErrorAction SilentlyContinue | Measure-Object -Line\\).Lines\")"
     ]
   }
 }

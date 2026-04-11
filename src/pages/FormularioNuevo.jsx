@@ -176,6 +176,7 @@ export default function FormularioNuevo() {
         p_accion: 'crear',
         p_modulo: 'servicios',
         p_descripcion: `Nuevo servicio creado para "${servicio.nombre_cliente}"`,
+        p_referencia_id: numeroFormulario,
       })
       navigate('/servicios')
     } catch (e) {

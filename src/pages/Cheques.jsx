@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { supabase, CLIENTE_ID, clp } from '../lib/supabase'
-import { AlertTriangle, Download, CheckCircle, Clock, XCircle } from 'lucide-react'
+import { AlertTriangle, Download, CheckCircle, Clock, XCircle, History, X } from 'lucide-react'
 import { exportarExcel } from '../lib/exportExcel'
 import { SkeletonTabla } from '../components/SkeletonLoader'
+import HistorialAuditoria from '../components/HistorialAuditoria'
 
 function diasRestantes(fecha) {
   if (!fecha) return null
@@ -15,6 +16,7 @@ export default function Cheques() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState('')
+  const [historialItem, setHistorialItem] = useState(null)
 
   async function cargar() {
     const { data } = await supabase.from('cheques').select('*')
@@ -40,15 +42,20 @@ export default function Cheques() {
 
   async function cambiarEstado(id, nuevoEstado) {
     const { error } = await supabase.from('cheques').update({ estado: nuevoEstado }).eq('id', id)
-    if (!error) {
-      const cheque = rows.find(r => r.id === id)
-      supabase.rpc('registrar_auditoria', {
-        p_accion: 'actualizar',
-        p_modulo: 'cheques',
-        p_descripcion: `Cheque #${cheque?.numero_formulario || id} marcado como "${nuevoEstado}"`,
-      })
-    }
-    cargar()
+    if (error) return
+
+    const cheque = rows.find(r => r.id === id)
+
+    // Actualización inmediata en UI
+    setRows(prev => prev.map(r => r.id === id ? { ...r, estado: nuevoEstado } : r))
+
+    // Auditoría — await para que quede grabado
+    await supabase.rpc('registrar_auditoria', {
+      p_accion: 'actualizar',
+      p_modulo: 'cheques',
+      p_descripcion: `Cheque del formulario #${cheque?.numero_formulario} marcado como "${nuevoEstado}"`,
+      p_referencia_id: cheque?.numero_formulario,
+    })
   }
 
   function exportar() {
@@ -77,6 +84,7 @@ export default function Cheques() {
   }
 
   return (
+    <>
     <div className="space-y-4 page-enter">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -166,6 +174,13 @@ export default function Cheques() {
                           <option value="cobrado">Cobrado</option>
                         </select>
                       </td>
+                      <td className="px-4 py-3">
+                        <button onClick={() => setHistorialItem(r)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                          title="Ver historial">
+                          <History className="w-4 h-4" />
+                        </button>
+                      </td>
                     </tr>
                   )
                 })}
@@ -175,5 +190,29 @@ export default function Cheques() {
         </div>
       )}
     </div>
+
+    {historialItem && (
+      <div className="modal-backdrop">
+        <div className="modal-panel w-full max-w-lg">
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="font-bold text-slate-900">Historial del formulario</h3>
+                <p className="text-xs text-slate-400 mt-0.5">#{historialItem.numero_formulario}</p>
+              </div>
+              <button onClick={() => setHistorialItem(null)}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto">
+              <HistorialAuditoria referenciaId={historialItem.numero_formulario}
+                modulos={['cheques']} />
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+  </>
   )
 }

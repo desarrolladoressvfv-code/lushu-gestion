@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { supabase, CLIENTE_ID, clp } from '../lib/supabase'
-import { Search, Download, DollarSign, CreditCard, CheckSquare, AlertCircle, ClipboardCheck } from 'lucide-react'
+import { Search, Download, DollarSign, CreditCard, CheckSquare, AlertCircle, ClipboardCheck, History, X } from 'lucide-react'
 import { exportarExcel } from '../lib/exportExcel'
 import { SkeletonTabla } from '../components/SkeletonLoader'
+import HistorialAuditoria from '../components/HistorialAuditoria'
 
 export default function FormasPago() {
   const [rows, setRows] = useState([])
@@ -10,6 +11,8 @@ export default function FormasPago() {
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
   const [tab, setTab] = useState('registros') // 'registros' | 'seguimiento'
+  const [historialItem, setHistorialItem] = useState(null)
+  const [errorEstado, setErrorEstado] = useState('')
 
   async function cargar() {
     const { data } = await supabase.from('formas_pago')
@@ -39,37 +42,48 @@ export default function FormasPago() {
     // B7: al marcar pagado → saldo_pendiente = 0 para que el dashboard sea correcto
     const updates = { estado: nuevoEstado }
     if (nuevoEstado === 'pagado') updates.saldo_pendiente = 0
+
     const { error } = await supabase.from('formas_pago').update(updates).eq('id', id)
-    if (!error) {
-      const fila = rows.find(r => r.id === id)
-      supabase.rpc('registrar_auditoria', {
-        p_accion: 'actualizar',
-        p_modulo: 'formas_pago',
-        p_descripcion: `Formulario #${fila?.numero_formulario} marcado como "${nuevoEstado}"`,
-      })
-      // S3: notificar por email si pasa a pendiente
-      if (nuevoEstado === 'pendiente') {
-        const fila = rows.find(r => r.id === id)
-        const { data: { session } } = await supabase.auth.getSession()
-        const { data: cliente } = await supabase.from('clientes').select('email_admin').eq('id', fila?.cliente_id).maybeSingle()
-        if (cliente?.email_admin && fila) {
-          fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notificar-pago-pendiente`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session?.access_token}`,
-              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-            },
-            body: JSON.stringify({
-              numero_formulario: fila.numero_formulario,
-              saldo_pendiente: fila.saldo_pendiente || 0,
-              nombre_cliente: fila.convenios?.nombre || `Formulario #${fila.numero_formulario}`,
-              email_admin: cliente.email_admin,
-            }),
-          }).catch(() => {}) // silencioso: el email es best-effort
-        }
+
+    if (error) {
+      setErrorEstado(`No se pudo cambiar el estado: ${error.message}`)
+      setTimeout(() => setErrorEstado(''), 5000)
+      return
+    }
+
+    const fila = rows.find(r => r.id === id)
+
+    // Actualización inmediata en UI (sin round-trip)
+    setRows(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r))
+
+    // Auditoría — await para que quede grabado antes de que el usuario abra el historial
+    await supabase.rpc('registrar_auditoria', {
+      p_accion: 'actualizar',
+      p_modulo: 'formas_pago',
+      p_descripcion: `Formulario #${fila?.numero_formulario} marcado como "${nuevoEstado}"`,
+      p_referencia_id: fila?.numero_formulario,
+    })
+
+    // S3: notificar por email si pasa a pendiente
+    if (nuevoEstado === 'pendiente' && fila) {
+      const { data: { session } } = await supabase.auth.getSession()
+      const { data: cliente } = await supabase.from('clientes').select('email_admin').eq('id', fila.cliente_id).maybeSingle()
+      if (cliente?.email_admin) {
+        fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notificar-pago-pendiente`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            numero_formulario: fila.numero_formulario,
+            saldo_pendiente: fila.saldo_pendiente || 0,
+            nombre_cliente: fila.convenios?.nombre || `Formulario #${fila.numero_formulario}`,
+            email_admin: cliente.email_admin,
+          }),
+        }).catch(() => {}) // silencioso: el email es best-effort
       }
-      cargar()
     }
   }
 
@@ -100,6 +114,7 @@ export default function FormasPago() {
   ]
 
   return (
+    <>
     <div className="space-y-4 page-enter">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -126,6 +141,13 @@ export default function FormasPago() {
           </button>
         </div>
       </div>
+
+      {/* Error estado */}
+      {errorEstado && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />{errorEstado}
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -176,6 +198,7 @@ export default function FormasPago() {
             <option value="">Todos los estados</option>
             <option value="pagado">Pagado</option>
             <option value="pendiente">Pendiente</option>
+            <option value="vencido">Vencido</option>
           </select>
         </div>
 
@@ -218,13 +241,23 @@ export default function FormasPago() {
                       <td className="px-3 py-3">
                         <select value={r.estado} onChange={e => cambiarEstado(r.id, e.target.value)}
                           className={`text-xs font-semibold px-2.5 py-1 rounded-full border-0 cursor-pointer ${
-                            r.estado === 'pagado' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                            r.estado === 'pagado'   ? 'bg-emerald-100 text-emerald-700'
+                            : r.estado === 'vencido' ? 'bg-red-100 text-red-700'
+                            : 'bg-amber-100 text-amber-700'
                           }`}>
                           <option value="pagado">Pagado</option>
                           <option value="pendiente">Pendiente</option>
+                          <option value="vencido">Vencido</option>
                         </select>
                       </td>
                       <td className="px-3 py-3 text-slate-500 max-w-xs truncate">{r.info_adicional || '-'}</td>
+                      <td className="px-3 py-3">
+                        <button onClick={() => setHistorialItem(r)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                          title="Ver historial">
+                          <History className="w-4 h-4" />
+                        </button>
+                      </td>
                     </tr>
                   )})}
                 </tbody>
@@ -300,5 +333,29 @@ export default function FormasPago() {
         )
       })()}
     </div>
+    {/* Modal historial */}
+    {historialItem && (
+      <div className="modal-backdrop">
+        <div className="modal-panel w-full max-w-lg">
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="font-bold text-slate-900">Historial del formulario</h3>
+                <p className="text-xs text-slate-400 mt-0.5">#{historialItem.numero_formulario}</p>
+              </div>
+              <button onClick={() => setHistorialItem(null)}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto">
+              <HistorialAuditoria referenciaId={historialItem.numero_formulario}
+                modulos={['formas_pago']} />
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+  </>
   )
 }

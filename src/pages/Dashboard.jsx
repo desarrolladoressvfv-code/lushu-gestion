@@ -1,26 +1,27 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase, CLIENTE_ID, clp } from '../lib/supabase'
-import { hoyCL, haceNmesesCL } from '../lib/fecha'
-import { ClipboardList, DollarSign, AlertTriangle, CheckSquare, Package, ShoppingCart, TrendingUp, Users, ArrowRight, Building2 } from 'lucide-react'
+import { hoyCL } from '../lib/fecha'
+import { ClipboardList, DollarSign, AlertTriangle, CheckSquare, Package, ShoppingCart, TrendingUp, Users, ArrowRight, Building2, Calendar, ChevronDown } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { SkeletonKPI, SkeletonGrafico, SkeletonTabla } from '../components/SkeletonLoader'
+import { SkeletonKPI, SkeletonTabla } from '../components/SkeletonLoader'
 import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+  BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart
 } from 'recharts'
 
-const PERIODOS = ['Diario', 'Semanal', 'Mensual', 'Anual']
+const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+const PERIODOS = ['Diario', 'Semanal', 'Mensual']
 const COLORES_PIE = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444']
 
 const KPI_CONFIG = [
-  { key: 'serviciosMes',    label: 'Servicios este mes',    icon: ClipboardList, ruta: '/servicios',   gradiente: 'from-blue-500 to-blue-700',    sombra: 'shadow-blue-500/30' },
-  { key: 'ventasMes',       label: 'Ventas este mes',       icon: DollarSign,    ruta: '/ventas',       gradiente: 'from-emerald-500 to-emerald-700', sombra: 'shadow-emerald-500/30', dinero: true },
-  { key: 'pagoPendiente',   label: 'Cobros pendientes',     icon: AlertTriangle, ruta: '/formas-pago',  gradiente: 'from-amber-500 to-orange-600',  sombra: 'shadow-amber-500/30',  dinero: true },
-  { key: 'chequesPorVencer',label: 'Cheques por vencer',    icon: CheckSquare,   ruta: '/cheques',      gradiente: 'from-red-500 to-red-700',       sombra: 'shadow-red-500/30',    sub: 'Próximos 7 días' },
-  { key: 'stockBajo',       label: 'Productos stock bajo',  icon: Package,       ruta: '/inventario',   gradiente: 'from-orange-500 to-orange-700', sombra: 'shadow-orange-500/30' },
-  { key: 'ocPendientes',    label: 'OC pendientes',         icon: ShoppingCart,  ruta: '/compras',      gradiente: 'from-violet-500 to-violet-700', sombra: 'shadow-violet-500/30' },
-  { key: 'fallecidosMes',   label: 'Fallecidos este mes',   icon: Users,         ruta: '/fallecidos',   gradiente: 'from-slate-500 to-slate-700',   sombra: 'shadow-slate-500/30' },
-  { key: 'totalServicios',  label: 'Total servicios',       icon: TrendingUp,    ruta: '/servicios',    gradiente: 'from-cyan-500 to-cyan-700',     sombra: 'shadow-cyan-500/30' },
+  { key: 'servicios',        label: 'Servicios',           icon: ClipboardList, ruta: '/servicios',  gradiente: 'from-blue-500 to-blue-700',       sombra: 'shadow-blue-500/30' },
+  { key: 'ventas',           label: 'Ventas',              icon: DollarSign,    ruta: '/ventas',      gradiente: 'from-emerald-500 to-emerald-700', sombra: 'shadow-emerald-500/30', dinero: true },
+  { key: 'pagoPendiente',    label: 'Cobros pendientes',   icon: AlertTriangle, ruta: '/formas-pago', gradiente: 'from-amber-500 to-orange-600',    sombra: 'shadow-amber-500/30',  dinero: true },
+  { key: 'chequesPorVencer', label: 'Cheques por vencer',  icon: CheckSquare,   ruta: '/cheques',     gradiente: 'from-red-500 to-red-700',         sombra: 'shadow-red-500/30',    sub: 'Próximos 7 días' },
+  { key: 'stockBajo',        label: 'Productos stock bajo',icon: Package,       ruta: '/inventario',  gradiente: 'from-orange-500 to-orange-700',   sombra: 'shadow-orange-500/30' },
+  { key: 'ocPendientes',     label: 'OC pendientes',       icon: ShoppingCart,  ruta: '/compras',     gradiente: 'from-violet-500 to-violet-700',   sombra: 'shadow-violet-500/30' },
+  { key: 'fallecidos',       label: 'Fallecidos',          icon: Users,         ruta: '/fallecidos',  gradiente: 'from-slate-500 to-slate-700',     sombra: 'shadow-slate-500/30' },
+  { key: 'totalAnual',       label: 'Total año',           icon: TrendingUp,    ruta: '/servicios',   gradiente: 'from-cyan-500 to-cyan-700',       sombra: 'shadow-cyan-500/30' },
 ]
 
 function getWeek(d) {
@@ -33,7 +34,7 @@ function getWeek(d) {
 function formatFecha(fecha, periodo) {
   if (!fecha) return ''
   const d = new Date(fecha + 'T00:00:00')
-  if (periodo === 'Diario') return d.toLocaleDateString('es-CL', { day: '2-digit', month: 'short' })
+  if (periodo === 'Diario')  return d.toLocaleDateString('es-CL', { day: '2-digit', month: 'short' })
   if (periodo === 'Semanal') return `Sem ${getWeek(d)}`
   if (periodo === 'Mensual') return d.toLocaleDateString('es-CL', { month: 'short', year: '2-digit' })
   return d.getFullYear().toString()
@@ -41,16 +42,15 @@ function formatFecha(fecha, periodo) {
 
 function agruparVentas(ventas, periodo) {
   const mapa = {}
-  // Ordenar cronológicamente antes de agrupar para preservar orden de inserción
   const sorted = [...ventas].sort((a, b) => (a.fecha_servicio > b.fecha_servicio ? 1 : -1))
   sorted.forEach(v => {
     const key = formatFecha(v.fecha_servicio, periodo)
     if (!key) return
     if (!mapa[key]) mapa[key] = { fecha: key, total: 0, cantidad: 0 }
-    mapa[key].total += v.venta_total || 0
+    mapa[key].total    += v.venta_total || 0
     mapa[key].cantidad += 1
   })
-  return Object.values(mapa).slice(-14)
+  return Object.values(mapa).slice(-31)
 }
 
 const CustomTooltip = ({ active, payload, label }) => {
@@ -69,164 +69,217 @@ const CustomTooltip = ({ active, payload, label }) => {
 }
 
 export default function Dashboard() {
-  const navigate = useNavigate()
-  const [periodo, setPeriodo] = useState('Mensual')
-  const [sucursales, setSucursales] = useState([])
-  const [sucursalFiltro, setSucursalFiltro] = useState('')
-  const [kpis, setKpis] = useState(null)
-  const [ventasData, setVentasData] = useState([])
-  const [productosData, setProductosData] = useState([])
-  const [pagosData, setPagosData] = useState([])
-  const [ultimosServicios, setUltimosServicios] = useState([])
-  const [stockBajoItems, setStockBajoItems] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [loadingGraf, setLoadingGraf] = useState(false)
-  const [grafDesde, setGrafDesde] = useState('')
-  const [grafHasta, setGrafHasta] = useState('')
+  const navigate   = useNavigate()
+  const añoActual  = parseInt(hoyCL().split('-')[0])
 
-  // Carga sucursales una sola vez
+  const [periodo, setPeriodo]               = useState('Mensual')
+  const [sucursales, setSucursales]         = useState([])
+  const [sucursalFiltro, setSucursalFiltro] = useState('')
+  const [añoFiltro, setAñoFiltro]           = useState(añoActual)
+  const [mesFiltro, setMesFiltro]           = useState('')   // '' = año completo
+  const [añoCreacion, setAñoCreacion]       = useState(añoActual)
+  const [dropdownAbierto, setDropdownAbierto] = useState(false)
+
+  const [kpis, setKpis]                         = useState(null)
+  const [ventasData, setVentasData]             = useState([])
+  const [productosData, setProductosData]       = useState([])
+  const [pagosData, setPagosData]               = useState([])
+  const [ultimosServicios, setUltimosServicios] = useState([])
+  const [stockBajoItems, setStockBajoItems]     = useState([])
+  const [loading, setLoading]                   = useState(true)
+
+  // Años disponibles (desde creación hasta hoy)
+  const años = Array.from(
+    { length: añoActual - añoCreacion + 1 },
+    (_, i) => añoCreacion + i
+  )
+
+  // Carga inicial: sucursales + año de creación del cliente
   useEffect(() => {
-    supabase.from('sucursales').select('id,nombre').eq('cliente_id', CLIENTE_ID).eq('activo', true).order('nombre')
+    supabase.from('sucursales').select('id,nombre')
+      .eq('cliente_id', CLIENTE_ID).eq('activo', true).order('nombre')
       .then(({ data }) => setSucursales(data || []))
+
+    supabase.from('clientes').select('created_at')
+      .eq('id', CLIENTE_ID).single()
+      .then(({ data }) => {
+        if (data?.created_at) {
+          setAñoCreacion(new Date(data.created_at).getFullYear())
+        }
+      })
   }, [])
 
-  const cargar = useCallback(async (filtroSuc) => {
-    setLoading(true)
-    // M7: fechas en timezone Chile para evitar desfase UTC
-    const hoy       = hoyCL()
-    const [yy, mm]  = hoy.split('-').map(Number)
-    const inicioMes = `${yy}-${String(mm).padStart(2, '0')}-01`
-    const hace12m   = haceNmesesCL(12)
-    const en7dDate  = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))
-    en7dDate.setDate(en7dDate.getDate() + 7)
-    const en7d      = en7dDate.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' })
-
-    // Helper para tablas que tienen sucursal_id
-    const conFiltro = (q) => filtroSuc ? q.eq('sucursal_id', filtroSuc) : q
-
-    // Para tablas sin sucursal_id (cheques, fallecidos, formas_pago):
-    // obtenemos los numero_formulario de esa sucursal y filtramos por ellos
-    let formularios = null
-    if (filtroSuc) {
-      const { data: svcNums } = await supabase
-        .from('servicios').select('numero_formulario')
-        .eq('cliente_id', CLIENTE_ID).eq('sucursal_id', filtroSuc)
-      formularios = (svcNums || []).map(s => s.numero_formulario)
-    }
-    const conFiltroForm = (q) => {
-      if (formularios === null) return q
-      if (formularios.length === 0) return q.in('numero_formulario', [-1])
-      return q.in('numero_formulario', formularios)
-    }
-
-    const [
-      { data: serviciosMes },
-      { data: todasVentas },
-      { data: pagos },
-      { data: cheques },
-      { data: inventario },
-      { data: ultimosSvc },
-      { data: ocPendientes },
-      { data: fallecidosMes },
-      { data: totalSvc },
-    ] = await Promise.all([
-      conFiltro(supabase.from('servicios').select('id').eq('cliente_id', CLIENTE_ID).gte('fecha_servicio', inicioMes)),
-      // B1: limitado a últimos 12 meses
-      conFiltro(supabase.from('ventas').select('venta_total, fecha_servicio, productos(nombre)').eq('cliente_id', CLIENTE_ID).gte('fecha_servicio', hace12m)),
-      // formas_pago no tiene sucursal_id → filtrar por numero_formulario
-      conFiltroForm(supabase.from('formas_pago').select('saldo_pendiente, efectivo, tarjeta, valor_convenio, valor_cheques, monto_cuotas').eq('cliente_id', CLIENTE_ID)),
-      // cheques no tiene sucursal_id → filtrar por numero_formulario
-      conFiltroForm(supabase.from('cheques').select('id, monto, vencimiento').eq('cliente_id', CLIENTE_ID).eq('estado', 'vigente').lte('vencimiento', en7d)),
-      conFiltro(supabase.from('inventario').select('stock_actual, stock_minimo, producto_id, sucursal_id, productos(nombre), sucursales(nombre)').eq('cliente_id', CLIENTE_ID)),
-      conFiltro(supabase.from('servicios').select('numero_formulario, fecha_servicio, nombre_cliente, productos(nombre), sucursales(nombre)').eq('cliente_id', CLIENTE_ID).order('created_at', { ascending: false }).limit(5)),
-      filtroSuc
-        ? supabase.from('ordenes_compra').select('id').eq('cliente_id', CLIENTE_ID).eq('estado', 'pendiente').eq('sucursal_id', filtroSuc)
-        : supabase.from('ordenes_compra').select('id').eq('cliente_id', CLIENTE_ID).eq('estado', 'pendiente'),
-      // fallecidos no tiene sucursal_id → filtrar por numero_formulario
-      conFiltroForm(supabase.from('fallecidos').select('id').eq('cliente_id', CLIENTE_ID).gte('fecha_servicio', inicioMes)),
-      filtroSuc
-        ? supabase.from('servicios').select('id', { count: 'exact' }).eq('cliente_id', CLIENTE_ID).eq('sucursal_id', filtroSuc)
-        : supabase.from('servicios').select('id', { count: 'exact' }).eq('cliente_id', CLIENTE_ID),
-    ])
-
-    const ventasMes = (todasVentas || []).filter(v => v.fecha_servicio >= inicioMes)
-    const totalVentasMes = ventasMes.reduce((s, v) => s + (v.venta_total || 0), 0)
-    const totalPendiente = (pagos || []).filter(p => (p.saldo_pendiente || 0) > 0).length
-    const bajo = (inventario || []).filter(i => i.stock_actual <= i.stock_minimo)
-
-    setKpis({
-      serviciosMes: serviciosMes?.length || 0,
-      ventasMes: totalVentasMes,
-      pagoPendiente: totalPendiente,
-      chequesPorVencer: cheques?.length || 0,
-      stockBajo: bajo.length,
-      ocPendientes: ocPendientes?.length || 0,
-      fallecidosMes: fallecidosMes?.length || 0,
-      totalServicios: totalSvc?.length || 0,
-    })
-
-    setVentasData(agruparVentas(todasVentas || [], periodo))
-
-    const conteo = {}
-    ;(todasVentas || []).forEach(v => {
-      const n = v.productos?.nombre || 'Sin urna'
-      conteo[n] = (conteo[n] || 0) + 1
-    })
-    setProductosData(
-      Object.entries(conteo)
-        .map(([nombre, cantidad]) => ({ nombre: nombre.split(' ').slice(0, 2).join(' '), cantidad }))
-        .sort((a, b) => b.cantidad - a.cantidad).slice(0, 6)
-    )
-
-    const ef = (pagos || []).reduce((s, p) => s + (p.efectivo || 0), 0)
-    const tj = (pagos || []).reduce((s, p) => s + (p.tarjeta || 0), 0)
-    const cv = (pagos || []).reduce((s, p) => s + (p.valor_convenio || 0), 0)
-    const ch = (pagos || []).reduce((s, p) => s + (p.valor_cheques || 0), 0)
-    const cu = (pagos || []).reduce((s, p) => s + (p.monto_cuotas || 0), 0)
-    setPagosData([
-      { name: 'Efectivo', value: ef },
-      { name: 'Tarjeta', value: tj },
-      { name: 'Convenio', value: cv },
-      { name: 'Cheques', value: ch },
-      { name: 'Cuotas', value: cu },
-    ].filter(d => d.value > 0))
-
-    setUltimosServicios(ultimosSvc || [])
-    setStockBajoItems(bajo)
-    setLoading(false)
-  }, [periodo])
-
-  useEffect(() => { cargar(sucursalFiltro) }, [sucursalFiltro])
-
-  // Recarga gráfico de ventas al cambiar período o rango de fechas
+  // Carga principal
   useEffect(() => {
-    if (loading) return
-    setLoadingGraf(true)
-    const hace12mGraf = haceNmesesCL(12)
-    let q = supabase.from('ventas').select('venta_total, fecha_servicio')
-      .eq('cliente_id', CLIENTE_ID)
-    if (sucursalFiltro) q = q.eq('sucursal_id', sucursalFiltro)
-    // Si hay rango manual lo usa; si no, últimos 12 meses
-    if (grafDesde) q = q.gte('fecha_servicio', grafDesde)
-    else q = q.gte('fecha_servicio', hace12mGraf)
-    if (grafHasta) q = q.lte('fecha_servicio', grafHasta)
-    q.then(({ data }) => { setVentasData(agruparVentas(data || [], periodo)); setLoadingGraf(false) })
-  }, [periodo, grafDesde, grafHasta, sucursalFiltro])
+    let cancelado = false
+
+    async function cargar() {
+      setLoading(true)
+
+      // ── Rango del período seleccionado ───────────────────
+      let desdeQuery, hastaQuery
+      if (mesFiltro) {
+        const m         = parseInt(mesFiltro)
+        const ultimoDia = new Date(añoFiltro, m, 0).toLocaleDateString('en-CA')
+        desdeQuery = `${añoFiltro}-${mesFiltro}-01`
+        hastaQuery = ultimoDia
+      } else {
+        desdeQuery = `${añoFiltro}-01-01`
+        hastaQuery = `${añoFiltro}-12-31`
+      }
+
+      // Total anual siempre usa el año completo
+      const desdeAnual = `${añoFiltro}-01-01`
+      const hastaAnual = `${añoFiltro}-12-31`
+
+      const en7dDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))
+      en7dDate.setDate(en7dDate.getDate() + 7)
+      const en7d = en7dDate.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' })
+
+      const filtroSuc = sucursalFiltro
+      const conFiltro = (q) => filtroSuc ? q.eq('sucursal_id', filtroSuc) : q
+
+      // Pre-obtener formularios de la sucursal (sin filtro de fecha) para
+      // métricas de estado actual (cobros pendientes, cheques)
+      let formulariosSuc = null
+      if (filtroSuc) {
+        const { data: svcAll } = await supabase
+          .from('servicios').select('numero_formulario')
+          .eq('cliente_id', CLIENTE_ID).eq('sucursal_id', filtroSuc)
+        formulariosSuc = (svcAll || []).map(s => s.numero_formulario)
+      }
+      const conFiltroFormSuc = (q) => {
+        if (formulariosSuc === null) return q
+        if (formulariosSuc.length === 0) return q.in('numero_formulario', [-1])
+        return q.in('numero_formulario', formulariosSuc)
+      }
+
+      if (cancelado) return
+
+      const [
+        { data: serviciosData },
+        { data: todasVentas },
+        { data: pagos },
+        { data: cheques },
+        { data: inventario },
+        { data: ultimosSvc },
+        { data: ocPendientes },
+        { data: fallecidosData },
+        { data: totalAnualData },
+      ] = await Promise.all([
+        conFiltro(supabase.from('servicios').select('id')
+          .eq('cliente_id', CLIENTE_ID)
+          .gte('fecha_servicio', desdeQuery).lte('fecha_servicio', hastaQuery)),
+
+        conFiltro(supabase.from('ventas').select('venta_total, fecha_servicio, productos(nombre)')
+          .eq('cliente_id', CLIENTE_ID)
+          .gte('fecha_servicio', desdeQuery).lte('fecha_servicio', hastaQuery)),
+
+        conFiltroFormSuc(supabase.from('formas_pago')
+          .select('saldo_pendiente, efectivo, tarjeta, valor_convenio, valor_cheques, monto_cuotas')
+          .eq('cliente_id', CLIENTE_ID)),
+
+        conFiltroFormSuc(supabase.from('cheques')
+          .select('id, monto, vencimiento')
+          .eq('cliente_id', CLIENTE_ID).eq('estado', 'vigente').lte('vencimiento', en7d)),
+
+        conFiltro(supabase.from('inventario')
+          .select('stock_actual, stock_minimo, producto_id, sucursal_id, productos(nombre), sucursales(nombre)')
+          .eq('cliente_id', CLIENTE_ID)),
+
+        conFiltro(supabase.from('servicios')
+          .select('numero_formulario, fecha_servicio, nombre_cliente, productos(nombre), sucursales(nombre)')
+          .eq('cliente_id', CLIENTE_ID)
+          .gte('fecha_servicio', desdeQuery).lte('fecha_servicio', hastaQuery)
+          .order('created_at', { ascending: false }).limit(5)),
+
+        conFiltro(supabase.from('ordenes_compra').select('id')
+          .eq('cliente_id', CLIENTE_ID).eq('estado', 'pendiente')),
+
+        conFiltroFormSuc(supabase.from('fallecidos').select('id')
+          .eq('cliente_id', CLIENTE_ID)
+          .gte('fecha_servicio', desdeQuery).lte('fecha_servicio', hastaQuery)),
+
+        conFiltro(supabase.from('servicios').select('id')
+          .eq('cliente_id', CLIENTE_ID)
+          .gte('fecha_servicio', desdeAnual).lte('fecha_servicio', hastaAnual)),
+      ])
+
+      if (cancelado) return
+
+      const totalVentas    = (todasVentas || []).reduce((s, v) => s + (v.venta_total || 0), 0)
+      const totalPendiente = (pagos || []).filter(p => (p.saldo_pendiente || 0) > 0).length
+      const bajo           = (inventario || []).filter(i => i.stock_actual <= i.stock_minimo)
+
+      setKpis({
+        servicios:        serviciosData?.length  || 0,
+        ventas:           totalVentas,
+        pagoPendiente:    totalPendiente,
+        chequesPorVencer: cheques?.length        || 0,
+        stockBajo:        bajo.length,
+        ocPendientes:     ocPendientes?.length   || 0,
+        fallecidos:       fallecidosData?.length || 0,
+        totalAnual:       totalAnualData?.length || 0,
+      })
+
+      setVentasData(agruparVentas(todasVentas || [], periodo))
+
+      const conteo = {}
+      ;(todasVentas || []).forEach(v => {
+        const n = v.productos?.nombre || 'Sin urna'
+        conteo[n] = (conteo[n] || 0) + 1
+      })
+      setProductosData(
+        Object.entries(conteo)
+          .map(([nombre, cantidad]) => ({ nombre: nombre.split(' ').slice(0, 2).join(' '), cantidad }))
+          .sort((a, b) => b.cantidad - a.cantidad).slice(0, 6)
+      )
+
+      const ef = (pagos || []).reduce((s, p) => s + (p.efectivo       || 0), 0)
+      const tj = (pagos || []).reduce((s, p) => s + (p.tarjeta        || 0), 0)
+      const cv = (pagos || []).reduce((s, p) => s + (p.valor_convenio || 0), 0)
+      const ch = (pagos || []).reduce((s, p) => s + (p.valor_cheques  || 0), 0)
+      const cu = (pagos || []).reduce((s, p) => s + (p.monto_cuotas   || 0), 0)
+      setPagosData([
+        { name: 'Efectivo', value: ef },
+        { name: 'Tarjeta',  value: tj },
+        { name: 'Convenio', value: cv },
+        { name: 'Cheques',  value: ch },
+        { name: 'Cuotas',   value: cu },
+      ].filter(d => d.value > 0))
+
+      setUltimosServicios(ultimosSvc || [])
+      setStockBajoItems(bajo)
+      setLoading(false)
+    }
+
+    cargar()
+    return () => { cancelado = true }
+  }, [sucursalFiltro, periodo, mesFiltro, añoFiltro])
 
   const formatKpiValue = (cfg) => {
     if (!kpis) return '—'
     const v = kpis[cfg.key]
-    if (cfg.dinero) return clp(v)
-    return v
+    return cfg.dinero ? clp(v) : v
   }
 
   const nombreSucursalActual = sucursalFiltro
     ? sucursales.find(s => s.id === sucursalFiltro)?.nombre || 'Sucursal'
-    : 'General'
+    : 'Todas las sucursales'
+
+  const periodoLabel = mesFiltro
+    ? `${MESES[parseInt(mesFiltro) - 1]} ${añoFiltro}`
+    : `Año ${añoFiltro}`
+
+  const labelBoton = mesFiltro
+    ? `${MESES[parseInt(mesFiltro) - 1]} ${añoFiltro}`
+    : `Año ${añoFiltro}`
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+
+      {/* ── Header + Filtros ─────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
           <p className="text-sm text-slate-400 mt-0.5">
@@ -234,21 +287,18 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* Selector de sucursal */}
-        {sucursales.length > 0 && (
-          <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-slate-400 flex-shrink-0" />
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Filtro sucursal */}
+          {sucursales.length > 0 && (
             <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
-              <button
-                onClick={() => setSucursalFiltro('')}
+              <button onClick={() => setSucursalFiltro('')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 whitespace-nowrap ${
                   !sucursalFiltro ? 'bg-white shadow text-blue-600 font-semibold' : 'text-slate-500 hover:text-slate-700'
                 }`}>
                 General
               </button>
               {sucursales.map(s => (
-                <button key={s.id}
-                  onClick={() => setSucursalFiltro(s.id)}
+                <button key={s.id} onClick={() => setSucursalFiltro(s.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 whitespace-nowrap ${
                     sucursalFiltro === s.id ? 'bg-white shadow text-blue-600 font-semibold' : 'text-slate-500 hover:text-slate-700'
                   }`}>
@@ -256,11 +306,79 @@ export default function Dashboard() {
                 </button>
               ))}
             </div>
+          )}
+
+          {/* Filtro período (dropdown) */}
+          <div className="relative">
+            <button
+              onClick={() => setDropdownAbierto(v => !v)}
+              className="flex items-center gap-2 bg-white border border-slate-200 hover:border-blue-400 shadow-sm px-3.5 py-2 rounded-xl text-sm font-medium text-slate-700 transition-all duration-150 whitespace-nowrap">
+              <Calendar className="w-4 h-4 text-blue-500" />
+              {labelBoton}
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${dropdownAbierto ? 'rotate-180' : ''}`} />
+            </button>
+
+            {dropdownAbierto && (
+              <>
+                {/* Backdrop */}
+                <div className="fixed inset-0 z-40" onClick={() => setDropdownAbierto(false)} />
+
+                {/* Panel */}
+                <div className="absolute right-0 top-full mt-2 z-50 bg-white rounded-2xl shadow-xl border border-slate-100 p-4 w-72">
+
+                  {/* Años */}
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Año</p>
+                  <div className="flex gap-1.5 flex-wrap mb-4">
+                    {años.map(a => (
+                      <button key={a}
+                        onClick={() => { setAñoFiltro(a); setMesFiltro('') }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
+                          añoFiltro === a
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}>
+                        {a}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Meses */}
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Período</p>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {/* Año completo */}
+                    <button
+                      onClick={() => { setMesFiltro(''); setDropdownAbierto(false) }}
+                      className={`col-span-4 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
+                        !mesFiltro
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}>
+                      Año completo
+                    </button>
+
+                    {MESES.map((m, i) => {
+                      const val = String(i + 1).padStart(2, '0')
+                      return (
+                        <button key={i}
+                          onClick={() => { setMesFiltro(val); setDropdownAbierto(false) }}
+                          className={`py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
+                            mesFiltro === val
+                              ? 'bg-blue-600 text-white shadow-sm'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}>
+                          {m}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
-      {/* KPIs */}
+      {/* ── KPIs ─────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {KPI_CONFIG.map((cfg, i) =>
           loading ? <SkeletonKPI key={cfg.key} /> : (
@@ -281,44 +399,28 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Gráfico de ventas */}
+      {/* ── Gráfico evolución de ventas ──────────────────── */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-        <div className="flex flex-col gap-3 mb-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="font-bold text-slate-800">Evolución de Ventas</h2>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {sucursalFiltro ? `Sucursal: ${nombreSucursalActual}` : 'Todas las sucursales'}
-              </p>
-            </div>
-            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl self-start sm:self-auto">
-              {PERIODOS.map(p => (
-                <button key={p} onClick={() => setPeriodo(p)}
-                  className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
-                    periodo === p ? 'bg-white shadow text-blue-600 font-semibold' : 'text-slate-500 hover:text-slate-700'
-                  }`}>
-                  {p}
-                </button>
-              ))}
-            </div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+          <div>
+            <h2 className="font-bold text-slate-800">Evolución de Ventas</h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {periodoLabel} · {nombreSucursalActual}
+            </p>
           </div>
-          {/* Filtro por rango de fechas */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-slate-500 font-medium">Rango:</span>
-            <input type="date" value={grafDesde} onChange={e => setGrafDesde(e.target.value)}
-              className="input-base text-xs py-1.5 w-36" title="Desde" />
-            <span className="text-xs text-slate-400">—</span>
-            <input type="date" value={grafHasta} onChange={e => setGrafHasta(e.target.value)}
-              className="input-base text-xs py-1.5 w-36" title="Hasta" />
-            {(grafDesde || grafHasta) && (
-              <button onClick={() => { setGrafDesde(''); setGrafHasta('') }}
-                className="text-xs text-slate-400 hover:text-slate-600 underline transition-colors">
-                Limpiar
+          <div className="flex gap-1 bg-slate-100 p-1 rounded-xl self-start sm:self-auto">
+            {PERIODOS.map(p => (
+              <button key={p} onClick={() => setPeriodo(p)}
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ${
+                  periodo === p ? 'bg-white shadow text-blue-600 font-semibold' : 'text-slate-500 hover:text-slate-700'
+                }`}>
+                {p}
               </button>
-            )}
+            ))}
           </div>
         </div>
-        {loading || loadingGraf ? <div className="skeleton h-52 rounded-xl" /> :
+
+        {loading ? <div className="skeleton h-52 rounded-xl" /> :
          ventasData.length === 0 ? (
            <div className="h-52 flex items-center justify-center text-slate-400 text-sm">Sin datos para mostrar</div>
          ) : (
@@ -326,7 +428,7 @@ export default function Dashboard() {
             <AreaChart data={ventasData}>
               <defs>
                 <linearGradient id="gradVentas" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
+                  <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.15} />
                   <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                 </linearGradient>
               </defs>
@@ -341,13 +443,11 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Gráficos secundarios */}
+      {/* ── Gráficos secundarios ─────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
           <h2 className="font-bold text-slate-800 mb-0.5">Urnas Más Vendidas</h2>
-          <p className="text-xs text-slate-400 mb-4">
-            {sucursalFiltro ? nombreSucursalActual : 'Todas las sucursales'}
-          </p>
+          <p className="text-xs text-slate-400 mb-4">{periodoLabel} · {nombreSucursalActual}</p>
           {loading ? <div className="skeleton h-52 rounded-xl" /> :
            productosData.length === 0 ? (
             <div className="h-52 flex items-center justify-center text-slate-400 text-sm">Sin datos</div>
@@ -370,9 +470,7 @@ export default function Dashboard() {
 
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
           <h2 className="font-bold text-slate-800 mb-0.5">Formas de Pago</h2>
-          <p className="text-xs text-slate-400 mb-4">
-            {sucursalFiltro ? nombreSucursalActual : 'Distribución acumulada total'}
-          </p>
+          <p className="text-xs text-slate-400 mb-4">{nombreSucursalActual} · distribución acumulada</p>
           {loading ? <div className="skeleton h-52 rounded-xl" /> :
            pagosData.length === 0 ? (
             <div className="h-52 flex items-center justify-center text-slate-400 text-sm">Sin datos</div>
@@ -391,13 +489,13 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Últimos servicios + Stock bajo */}
+      {/* ── Últimos servicios + Stock bajo ───────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="font-bold text-slate-800">Últimos Servicios</h2>
-              {sucursalFiltro && <p className="text-xs text-slate-400 mt-0.5">{nombreSucursalActual}</p>}
+              <p className="text-xs text-slate-400 mt-0.5">{periodoLabel} · {nombreSucursalActual}</p>
             </div>
             <button onClick={() => navigate('/servicios')} className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
               Ver todos <ArrowRight className="w-3 h-3" />
@@ -405,7 +503,7 @@ export default function Dashboard() {
           </div>
           {loading ? <SkeletonTabla filas={4} cols={3} /> :
            ultimosServicios.length === 0 ? (
-            <p className="text-slate-400 text-sm py-6 text-center">Sin servicios registrados.</p>
+            <p className="text-slate-400 text-sm py-6 text-center">Sin servicios en el período.</p>
            ) : (
             <div className="space-y-2">
               {ultimosServicios.map(s => (

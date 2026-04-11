@@ -3,10 +3,10 @@ import {
   LayoutDashboard, FilePlus, FileText, ClipboardList,
   DollarSign, CreditCard, CheckSquare, Users, Package,
   ArrowLeftRight, ShoppingCart, Truck, Settings, ChevronDown,
-  LogOut, KeyRound, X, Eye, EyeOff
+  LogOut, KeyRound, X, Eye, EyeOff, Calendar, Info,
 } from 'lucide-react'
 import bikloudLogo from '../assets/bikloud-logo-white.svg'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useEmpresa } from '../context/EmpresaContext'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -56,6 +56,96 @@ function NavGroup({ label, children, defaultOpen = true }) {
       </button>
       <div className={`space-y-0.5 overflow-hidden transition-all duration-300 ${open ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
         {children}
+      </div>
+    </div>
+  )
+}
+
+/* ── Modal Info Plan ────────────────────────────────────── */
+function ModalInfoPlan({ plan, planInfo, clienteId, vencimiento, onClose }) {
+  const [createdAt, setCreatedAt] = useState(null)
+
+  useEffect(() => {
+    if (!clienteId) return
+    supabase.from('clientes').select('created_at').eq('id', clienteId).single()
+      .then(({ data }) => { if (data) setCreatedAt(data.created_at) })
+  }, [clienteId])
+
+  function formatFecha(iso) {
+    if (!iso) return '—'
+    return new Date(iso).toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' })
+  }
+
+  function calcularProximoPago(createdAt) {
+    if (!createdAt) return '—'
+    const inicio = new Date(createdAt)
+    const hoy    = new Date()
+    const dia    = inicio.getDate()
+    let prox = new Date(hoy.getFullYear(), hoy.getMonth(), dia)
+    if (prox <= hoy) prox = new Date(hoy.getFullYear(), hoy.getMonth() + 1, dia)
+    return prox.toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' })
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-modal">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${planInfo.color}`}>
+              <Info className="w-4 h-4" />
+            </div>
+            <h3 className="font-bold text-slate-900 text-sm">Información del Plan</h3>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-5 space-y-4">
+          {/* Plan actual */}
+          <div className="bg-slate-50 rounded-xl p-4 flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${planInfo.color}`}>
+              <span className="text-sm font-bold">{planInfo.label.charAt(0)}</span>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 font-medium">Plan actual</p>
+              <p className="font-bold text-slate-900">{planInfo.label}</p>
+            </div>
+          </div>
+
+          {/* Fechas */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 py-2.5 border-b border-slate-100">
+              <Calendar className="w-4 h-4 text-slate-400 flex-shrink-0" />
+              <div>
+                <p className="text-xs text-slate-400">Fecha de inicio</p>
+                <p className="text-sm font-semibold text-slate-800">
+                  {createdAt ? formatFecha(createdAt) : <span className="text-slate-300">Cargando...</span>}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 py-2.5">
+              <Calendar className="w-4 h-4 text-blue-400 flex-shrink-0" />
+              <div>
+                <p className="text-xs text-slate-400">Próximo pago</p>
+                <p className="text-sm font-bold text-blue-600">
+                  {createdAt ? calcularProximoPago(createdAt) : <span className="text-slate-300">Cargando...</span>}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-xs text-slate-400 text-center">
+            El pago se realiza mensualmente en el mismo día de cada mes.
+          </p>
+        </div>
+
+        <div className="px-5 pb-5">
+          <button onClick={onClose} className="btn-secondary w-full justify-center">Cerrar</button>
+        </div>
       </div>
     </div>
   )
@@ -159,6 +249,7 @@ export default function Sidebar({ onClose }) {
   const { logout, perfil } = useAuth()
   const location = useLocation()
   const [modalPass, setModalPass] = useState(false)
+  const [modalPlan, setModalPlan] = useState(false)
 
   const plan       = perfil?.plan || 'basico'
   const esPro      = plan === 'profesional' || plan === 'enterprise'
@@ -196,7 +287,14 @@ export default function Sidebar({ onClose }) {
               ) : (
                 <p className="text-white text-xs font-semibold leading-tight truncate">{nombreEmpresa}</p>
               )}
-              <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full mt-0.5 inline-block ${planInfo.color}`}>{planInfo.label}</span>
+              {!esOperador && (
+                <button
+                  onClick={() => setModalPlan(true)}
+                  className={`text-xs font-semibold px-1.5 py-0.5 rounded-full mt-0.5 inline-block ${planInfo.color} hover:opacity-75 transition-opacity`}
+                  title="Ver información del plan">
+                  {planInfo.label}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -204,7 +302,9 @@ export default function Sidebar({ onClose }) {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-5 scrollbar-thin">
-        <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" onClick={onClose} tourId="nav-dashboard" />
+        {(!esOperador || puede('dashboard')) && (
+          <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" onClick={onClose} tourId="nav-dashboard" />
+        )}
 
         {/* Registros — solo si tiene al menos uno */}
         {(puede('formulario') || (esPro && puede('cotizacion'))) && (
@@ -285,6 +385,15 @@ export default function Sidebar({ onClose }) {
       </div>
 
       {modalPass && <ModalCambiarPassword onClose={() => setModalPass(false)} />}
+      {modalPlan && (
+        <ModalInfoPlan
+          plan={plan}
+          planInfo={planInfo}
+          clienteId={perfil?.cliente_id}
+          vencimiento={perfil?.clienteVencimiento}
+          onClose={() => setModalPlan(false)}
+        />
+      )}
     </div>
   )
 }

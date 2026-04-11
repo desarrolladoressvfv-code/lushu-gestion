@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase, CLIENTE_ID } from '../lib/supabase'
-import { Search, Download, Trash2, AlertTriangle } from 'lucide-react'
+import { Search, Download, Trash2, AlertTriangle, History, X, Pencil } from 'lucide-react'
 import { exportarExcel } from '../lib/exportExcel'
 import { SkeletonTabla } from '../components/SkeletonLoader'
 import Paginador, { usePaginacion } from '../components/Paginador'
+import HistorialAuditoria from '../components/HistorialAuditoria'
 
 export default function Servicios() {
+  const navigate = useNavigate()
   const [rows, setRows] = useState([])
   const [productos, setProductos] = useState([])
   const [trabajadores, setTrabajadores] = useState([])
@@ -19,16 +22,25 @@ export default function Servicios() {
   const [filtroDesde, setFiltroDesde] = useState('')
   const [filtroHasta, setFiltroHasta] = useState('')
 
-  const [pendingDelete, setPendingDelete] = useState(null) // servicio a eliminar
-  const [eliminando, setEliminando] = useState(false)
+  const [pendingDelete, setPendingDelete]     = useState(null)
+  const [eliminando, setEliminando]           = useState(false)
+  const [historialServicio, setHistorialServicio] = useState(null)
 
   async function eliminarServicio() {
     if (!pendingDelete) return
     setEliminando(true)
     const { error } = await supabase.rpc('eliminar_servicio_completo', { p_servicio_id: pendingDelete.id })
     setEliminando(false)
+    if (!error) {
+      supabase.rpc('registrar_auditoria', {
+        p_accion: 'eliminar',
+        p_modulo: 'servicios',
+        p_descripcion: `Servicio #${pendingDelete.numero_formulario} (${pendingDelete.nombre_cliente}) eliminado`,
+        p_referencia_id: pendingDelete.numero_formulario,
+      })
+      setRows(prev => prev.filter(r => r.id !== pendingDelete.id))
+    }
     setPendingDelete(null)
-    if (!error) setRows(prev => prev.filter(r => r.id !== pendingDelete.id))
   }
 
   useEffect(() => {
@@ -147,13 +159,29 @@ export default function Servicios() {
                     <td className="px-4 py-3 text-slate-500">{r.trabajadores?.nombre || '-'}</td>
                     <td className="px-4 py-3 text-slate-500">{r.sucursales?.nombre || '-'}</td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => setPendingDelete(r)}
-                        className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                        title="Eliminar servicio"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => navigate(`/formulario/editar/${r.id}`)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                          title="Editar formulario"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setHistorialServicio(r)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                          title="Ver historial"
+                        >
+                          <History className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setPendingDelete(r)}
+                          className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                          title="Eliminar servicio"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -165,8 +193,32 @@ export default function Servicios() {
       )}
     </div>
 
-    {/* Modal confirmación eliminar servicio */}
+    {/* Modal historial de auditoría */}
+    {historialServicio && (
+      <div className="modal-backdrop">
+        <div className="modal-panel w-full max-w-lg">
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="font-bold text-slate-900">Historial del formulario</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  #{historialServicio.numero_formulario} — {historialServicio.nombre_cliente}
+                </p>
+              </div>
+              <button onClick={() => setHistorialServicio(null)}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto">
+              <HistorialAuditoria referenciaId={historialServicio.numero_formulario} modulos={['servicios']} />
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
 
+    {/* Modal confirmación eliminar servicio */}
     {pendingDelete && (
       <div className="modal-backdrop">
         <div className="modal-panel w-full max-w-md">

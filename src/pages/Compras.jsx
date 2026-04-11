@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { supabase, CLIENTE_ID, clp } from '../lib/supabase'
-import { Plus, Trash2, Lock, X, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, Lock, X, AlertTriangle, History } from 'lucide-react'
 import { SkeletonTabla } from '../components/SkeletonLoader'
+import HistorialAuditoria from '../components/HistorialAuditoria'
 import { hoyCL } from '../lib/fecha'
 
 const itemVacio = () => ({ producto_id: '', cantidad: 1, precio_unitario: '' })
@@ -25,7 +26,8 @@ export default function Compras() {
   const [items, setItems] = useState([itemVacio()])
   const [alertaId, setAlertaId] = useState(null)
   const [pendingDelete, setPendingDelete] = useState(null)
-  const [eliminando, setEliminando] = useState(false)
+  const [eliminando, setEliminando]       = useState(false)
+  const [historialItem, setHistorialItem] = useState(null)
 
   async function cargar() {
     const [{ data: o }, { data: p }, { data: pr }, { data: s }] = await Promise.all([
@@ -87,6 +89,7 @@ export default function Compras() {
         p_accion: 'crear',
         p_modulo: 'compras',
         p_descripcion: `Nueva orden de compra creada (proveedor: ${proveedores.find(p => p.id === form.proveedor_id)?.nombre || form.proveedor_id})`,
+        p_referencia_id: oc.id,
       })
       setModal(false)
       cargar()
@@ -108,6 +111,7 @@ export default function Compras() {
         p_accion: 'eliminar',
         p_modulo: 'compras',
         p_descripcion: `Orden de compra #${pendingDelete.id} eliminada`,
+        p_referencia_id: pendingDelete.id,
       })
       setOrdenes(prev => prev.filter(o => o.id !== pendingDelete.id))
     }
@@ -151,13 +155,18 @@ export default function Compras() {
                     </td>
                     <td className="px-4 py-3 text-slate-500 max-w-xs truncate">{o.notas || '-'}</td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => setPendingDelete(o)}
-                        className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                        title="Eliminar orden"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => setHistorialItem(o)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                          title="Ver historial">
+                          <History className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => setPendingDelete(o)}
+                          className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                          title="Eliminar orden">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -296,6 +305,29 @@ export default function Compras() {
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-sm transition-colors disabled:opacity-60">
                   {eliminando ? 'Eliminando...' : 'Sí, eliminar'}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal historial OC */}
+      {historialItem && (
+        <div className="modal-backdrop">
+          <div className="modal-panel w-full max-w-lg">
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h3 className="font-bold text-slate-900">Historial de orden de compra</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">OC #{historialItem.id}</p>
+                </div>
+                <button onClick={() => setHistorialItem(null)}
+                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="max-h-[60vh] overflow-y-auto">
+                <HistorialAuditoria referenciaId={historialItem.id} modulos={['compras']} />
               </div>
             </div>
           </div>

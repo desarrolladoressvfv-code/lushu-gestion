@@ -51,6 +51,7 @@ import { useEmpresa } from '../context/EmpresaContext'
 const TABS = ['Mi Empresa', 'Productos', 'Convenios', 'Trabajadores', 'Proveedores', 'Sucursales', 'Usuarios', 'Auditoría']
 
 const TODOS_MODULOS = [
+  { key: 'dashboard',   label: 'Dashboard' },
   { key: 'formulario',  label: 'Nuevo Servicio' },
   { key: 'cotizacion',  label: 'Cotización' },
   { key: 'servicios',   label: 'Servicios' },
@@ -1100,9 +1101,17 @@ function TabAuditoria() {
   )
 }
 
+// Persiste el tab activo entre remontajes (Supabase refresca token al volver al tab)
+let _configTab = 0
+
 // ─── Página principal ─────────────────────────────────────────────────────────
 export default function Configuracion() {
-  const [tab, setTab] = useState(0)
+  const [tab, setTab] = useState(_configTab)
+
+  function cambiarTab(i) {
+    _configTab = i
+    setTab(i)
+  }
   const { reiniciarOnboarding } = useAuth()
   const { setFase } = useTour()
 
@@ -1112,7 +1121,7 @@ export default function Configuracion() {
   }
 
   return (
-    <div className="space-y-5 page-enter">
+    <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-slate-900">Configuración</h1>
         <button
@@ -1127,7 +1136,7 @@ export default function Configuracion() {
       {/* Tabs */}
       <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl w-fit max-w-full overflow-x-auto">
         {TABS.map((t, i) => (
-          <button key={t} onClick={() => setTab(i)}
+          <button key={t} onClick={() => cambiarTab(i)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150 whitespace-nowrap ${
               tab === i
                 ? 'bg-white shadow-sm text-slate-900'
