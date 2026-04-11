@@ -4,11 +4,12 @@ import { AlertTriangle, Download, CheckCircle, Clock, XCircle, History, X, Credi
 import { exportarExcel } from '../lib/exportExcel'
 import { SkeletonTabla } from '../components/SkeletonLoader'
 import HistorialAuditoria from '../components/HistorialAuditoria'
+import { hoyCL } from '../lib/fecha'
 
 function diasRestantes(fecha) {
   if (!fecha) return null
-  const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
-  const venc = new Date(fecha + 'T00:00:00')
+  const hoy  = new Date(hoyCL() + 'T00:00:00')
+  const venc = new Date(fecha   + 'T00:00:00')
   return Math.ceil((venc - hoy) / (1000 * 60 * 60 * 24))
 }
 

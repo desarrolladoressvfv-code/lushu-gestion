@@ -68,7 +68,7 @@ export function AuthProvider({ children }) {
       .from('usuarios')
       .select('rol, cliente_id, nombre, activo, debe_cambiar_pass, acceso_tipo, sucursal_id, modulos_permitidos')
       .eq('auth_user_id', userId)
-      .single()
+      .maybeSingle()
 
     if (usuario?.rol === 'superadmin') {
       setPerfil(usuario)
@@ -107,10 +107,13 @@ export function AuthProvider({ children }) {
         if (esNuevoLogin) {
           // Revocar todas las otras sesiones activas del mismo usuario (servidor)
           await supabase.auth.signOut({ scope: 'others' })
-          supabase.rpc('registrar_auditoria', {
-            p_accion: 'login', p_modulo: 'sesion', p_descripcion: 'Inicio de sesión',
-          })
-          supabase.rpc('actualizar_ultimo_acceso')
+          // allSettled: registrar sin bloquear login si alguno falla
+          await Promise.allSettled([
+            supabase.rpc('registrar_auditoria', {
+              p_accion: 'login', p_modulo: 'sesion', p_descripcion: 'Inicio de sesión',
+            }),
+            supabase.rpc('actualizar_ultimo_acceso'),
+          ])
         }
 
         iniciarCheck()

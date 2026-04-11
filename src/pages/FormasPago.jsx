@@ -68,7 +68,8 @@ export default function FormasPago() {
     if (nuevoEstado === 'pendiente' && fila) {
       const { data: { session } } = await supabase.auth.getSession()
       const { data: cliente } = await supabase.from('clientes').select('email_admin').eq('id', fila.cliente_id).maybeSingle()
-      if (cliente?.email_admin) {
+      const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cliente?.email_admin || '')
+      if (emailValido) {
         fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notificar-pago-pendiente`, {
           method: 'POST',
           headers: {

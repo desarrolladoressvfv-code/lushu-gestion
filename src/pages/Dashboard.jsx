@@ -151,13 +151,13 @@ export default function Dashboard() {
       if (cancelado) return
 
       const [
-        { data: serviciosData },
-        { data: todasVentas },
-        { data: pagos },
-        { data: cheques },
-        { data: inventario },
-        { data: ultimosSvc },
-        { data: ocPendientes },
+        { data: serviciosData, error: err1 },
+        { data: todasVentas,   error: err2 },
+        { data: pagos,         error: err3 },
+        { data: cheques,       error: err4 },
+        { data: inventario,    error: err5 },
+        { data: ultimosSvc,    error: err6 },
+        { data: ocPendientes,  error: err7 },
       ] = await Promise.all([
         conFiltro(supabase.from('servicios').select('id')
           .eq('cliente_id', CLIENTE_ID)
@@ -190,6 +190,11 @@ export default function Dashboard() {
       ])
 
       if (cancelado) return
+
+      if ([err1, err2, err3, err4, err5, err6, err7].every(Boolean)) {
+        setLoading(false)
+        return // fallo total: no actualizar con datos vacíos
+      }
 
       const totalVentas     = (todasVentas || []).reduce((s, v) => s + (v.venta_total || 0), 0)
       const countServicios  = serviciosData?.length || 0
