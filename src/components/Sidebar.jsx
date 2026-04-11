@@ -3,7 +3,7 @@ import {
   LayoutDashboard, FilePlus, FileText, ClipboardList,
   DollarSign, CreditCard, CheckSquare, Users, Package,
   ArrowLeftRight, ShoppingCart, Truck, Settings, ChevronDown,
-  LogOut, KeyRound, X, Eye, EyeOff, Calendar, Info, AlertTriangle,
+  LogOut, X, Calendar, Info, AlertTriangle,
 } from 'lucide-react'
 import bikloudLogo from '../assets/bikloud-logo-white.svg'
 import { useState, useEffect } from 'react'
@@ -154,104 +154,11 @@ function ModalInfoPlan({ plan, planInfo, clienteId, onClose }) {
   )
 }
 
-function ModalCambiarPassword({ onClose }) {
-  const [actual, setActual] = useState('')
-  const [nueva, setNueva] = useState('')
-  const [confirmar, setConfirmar] = useState('')
-  const [guardando, setGuardando] = useState(false)
-  const [error, setError] = useState('')
-  const [ok, setOk] = useState(false)
-  const [showActual, setShowActual] = useState(false)
-  const [showNueva, setShowNueva] = useState(false)
-
-  async function cambiar(e) {
-    e.preventDefault()
-    if (nueva.length < 6) { setError('La contraseña debe tener al menos 6 caracteres'); return }
-    if (nueva !== confirmar) { setError('Las contraseñas no coinciden'); return }
-    setGuardando(true)
-    setError('')
-    // Reautenticar con contraseña actual
-    const { data: { user } } = await supabase.auth.getUser()
-    const { error: reErr } = await supabase.auth.signInWithPassword({ email: user.email, password: actual })
-    if (reErr) { setError('La contraseña actual es incorrecta'); setGuardando(false); return }
-    // Actualizar contraseña
-    const { error: updErr } = await supabase.auth.updateUser({ password: nueva })
-    if (updErr) { setError(updErr.message); setGuardando(false); return }
-    setOk(true)
-    setGuardando(false)
-  }
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
-        <div className="flex items-center justify-between p-5 border-b border-slate-100">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-              <KeyRound className="w-4 h-4 text-blue-600" />
-            </div>
-            <h3 className="font-bold text-slate-900 text-sm">Cambiar Contraseña</h3>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        {ok ? (
-          <div className="p-6 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto mb-3">
-              <KeyRound className="w-6 h-6 text-emerald-600" />
-            </div>
-            <p className="font-semibold text-slate-900 mb-1">¡Contraseña actualizada!</p>
-            <p className="text-sm text-slate-500 mb-4">Usa tu nueva contraseña la próxima vez que inicies sesión.</p>
-            <button onClick={onClose} className="btn-primary w-full justify-center">Cerrar</button>
-          </div>
-        ) : (
-          <form onSubmit={cambiar} className="p-5 space-y-3">
-            <div>
-              <label className="label-base">Contraseña actual</label>
-              <div className="relative">
-                <input type={showActual ? 'text' : 'password'} value={actual} onChange={e => setActual(e.target.value)}
-                  className="input-base pr-10" required placeholder="••••••••" />
-                <button type="button" onClick={() => setShowActual(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                  {showActual ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-            <div>
-              <label className="label-base">Nueva contraseña</label>
-              <div className="relative">
-                <input type={showNueva ? 'text' : 'password'} value={nueva} onChange={e => setNueva(e.target.value)}
-                  className="input-base pr-10" required placeholder="Mínimo 6 caracteres" />
-                <button type="button" onClick={() => setShowNueva(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                  {showNueva ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-            <div>
-              <label className="label-base">Confirmar nueva contraseña</label>
-              <input type="password" value={confirmar} onChange={e => setConfirmar(e.target.value)}
-                className="input-base" required placeholder="Repite la contraseña" />
-            </div>
-            {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-3 py-2 text-xs">{error}</div>}
-            <div className="flex gap-2 pt-1">
-              <button type="button" onClick={onClose} className="btn-secondary flex-1 justify-center text-sm">Cancelar</button>
-              <button type="submit" disabled={guardando} className="btn-primary flex-1 justify-center text-sm">
-                {guardando ? 'Guardando...' : 'Cambiar'}
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
-  )
-}
 
 export default function Sidebar({ onClose }) {
   const { nombreEmpresa, logoUrl, alertas, cargandoEmpresa, errorEmpresa, reintentarEmpresa } = useEmpresa()
   const { logout, perfil } = useAuth()
   const location = useLocation()
-  const [modalPass, setModalPass] = useState(false)
   const [modalPlan, setModalPlan] = useState(false)
 
   // Derivados de perfil — deben ir ANTES de cualquier useEffect que los use
@@ -377,12 +284,6 @@ export default function Sidebar({ onClose }) {
           </NavGroup>
         )}
 
-        {/* Configuración — solo admin */}
-        {!esOperador && (
-          <NavGroup label="Sistema">
-            <NavItem to="/configuracion" icon={Settings} label="Configuración" onClick={onClose} />
-          </NavGroup>
-        )}
       </nav>
 
       {/* Footer */}
@@ -390,15 +291,9 @@ export default function Sidebar({ onClose }) {
         {perfil?.nombre && (
           <p className="text-xs text-slate-500 px-3 mb-2 truncate">{perfil.nombre}</p>
         )}
-        <button
-          onClick={() => setModalPass(true)}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-white/10 transition-all duration-150"
-        >
-          <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center">
-            <KeyRound className="w-3.5 h-3.5" />
-          </div>
-          Cambiar contraseña
-        </button>
+        {!esOperador && (
+          <NavItem to="/configuracion" icon={Settings} label="Configuración" onClick={onClose} />
+        )}
         <button
           onClick={logout}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-white/10 transition-all duration-150"
@@ -410,8 +305,6 @@ export default function Sidebar({ onClose }) {
         </button>
         <p className="text-xs text-slate-700 text-center pt-1">v2.0 · Gestión Funeraria</p>
       </div>
-
-      {modalPass && <ModalCambiarPassword onClose={() => setModalPass(false)} />}
       {modalPlan && (
         <ModalInfoPlan
           plan={plan}

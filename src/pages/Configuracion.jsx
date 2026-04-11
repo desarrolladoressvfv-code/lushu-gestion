@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase, CLIENTE_ID, clp } from '../lib/supabase'
-import { Plus, Pencil, Trash2, Check, X, PlayCircle, Building2, AlertTriangle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Check, X, PlayCircle, Building2, AlertTriangle, Eye, EyeOff, KeyRound } from 'lucide-react'
 
 /* ── Toast ─────────────────────────────────────────────── */
 function Toast({ mensaje, tipo, onClose }) {
@@ -48,7 +48,7 @@ import { useAuth } from '../context/AuthContext'
 import { useTour } from '../context/TourContext'
 import { useEmpresa } from '../context/EmpresaContext'
 
-const TABS = ['Mi Empresa', 'Productos', 'Convenios', 'Trabajadores', 'Proveedores', 'Sucursales', 'Usuarios', 'Auditoría']
+const TABS = ['Mi Empresa', 'Productos', 'Convenios', 'Trabajadores', 'Proveedores', 'Sucursales', 'Usuarios', 'Auditoría', 'Contraseña']
 
 const TODOS_MODULOS = [
   { key: 'dashboard',   label: 'Dashboard' },
@@ -1047,6 +1047,99 @@ function TabUsuarios() {
   )
 }
 
+// ─── Tab Contraseña ───────────────────────────────────────────────────────────
+function TabCambiarPassword() {
+  const [actual,    setActual]    = useState('')
+  const [nueva,     setNueva]     = useState('')
+  const [confirmar, setConfirmar] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [error,     setError]     = useState('')
+  const [ok,        setOk]        = useState(false)
+  const [showActual, setShowActual] = useState(false)
+  const [showNueva,  setShowNueva]  = useState(false)
+
+  async function cambiar(e) {
+    e.preventDefault()
+    if (nueva.length < 6) { setError('La contraseña debe tener al menos 6 caracteres'); return }
+    if (nueva !== confirmar) { setError('Las contraseñas no coinciden'); return }
+    setGuardando(true)
+    setError('')
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error: reErr } = await supabase.auth.signInWithPassword({ email: user.email, password: actual })
+    if (reErr) { setError('La contraseña actual es incorrecta'); setGuardando(false); return }
+    const { error: updErr } = await supabase.auth.updateUser({ password: nueva })
+    if (updErr) { setError(updErr.message); setGuardando(false); return }
+    setOk(true)
+    setActual(''); setNueva(''); setConfirmar('')
+    setGuardando(false)
+    setTimeout(() => setOk(false), 4000)
+  }
+
+  return (
+    <div className="max-w-md space-y-5">
+      <div className="form-section">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+            <KeyRound className="w-4 h-4 text-blue-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-slate-900 text-sm">Cambiar contraseña</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Usa tu nueva contraseña en el próximo inicio de sesión.</p>
+          </div>
+        </div>
+
+        {ok ? (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-4 py-3 text-sm font-medium flex items-center gap-2">
+            <Check className="w-4 h-4 flex-shrink-0" />
+            ¡Contraseña actualizada correctamente!
+          </div>
+        ) : (
+          <form onSubmit={cambiar} className="space-y-3">
+            <div>
+              <label className="label-base">Contraseña actual</label>
+              <div className="relative">
+                <input type={showActual ? 'text' : 'password'} value={actual}
+                  onChange={e => setActual(e.target.value)}
+                  className="input-base pr-10" required placeholder="••••••••" />
+                <button type="button" onClick={() => setShowActual(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  {showActual ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="label-base">Nueva contraseña</label>
+              <div className="relative">
+                <input type={showNueva ? 'text' : 'password'} value={nueva}
+                  onChange={e => setNueva(e.target.value)}
+                  className="input-base pr-10" required placeholder="Mínimo 6 caracteres" />
+                <button type="button" onClick={() => setShowNueva(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  {showNueva ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="label-base">Confirmar nueva contraseña</label>
+              <input type="password" value={confirmar}
+                onChange={e => setConfirmar(e.target.value)}
+                className="input-base" required placeholder="Repite la contraseña" />
+            </div>
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-3 py-2 text-xs">{error}</div>
+            )}
+            <div className="flex justify-end pt-1">
+              <button type="submit" disabled={guardando} className="btn-primary">
+                {guardando ? 'Guardando...' : 'Cambiar contraseña'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Tab Auditoría ────────────────────────────────────────────────────────────
 function TabAuditoria() {
   const [rows, setRows]           = useState([])
@@ -1247,6 +1340,7 @@ export default function Configuracion() {
       {tab === 5 && <TabSucursales />}
       {tab === 6 && <TabUsuarios />}
       {tab === 7 && <TabAuditoria />}
+      {tab === 8 && <TabCambiarPassword />}
     </div>
   )
 }
