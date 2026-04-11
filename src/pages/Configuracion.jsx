@@ -881,11 +881,7 @@ function TabUsuarios() {
   }
 
   async function resetPass(u) {
-    const nueva = prompt(`Nueva contraseña para ${u.nombre} (mín. 6 caracteres):`)
-    if (!nueva || nueva.length < 6) return
-    // Marcar debe_cambiar_pass = true para forzar cambio en próximo login
-    await supabase.from('usuarios').update({ debe_cambiar_pass: true }).eq('id', u.id)
-    setToast({ msg: `Se forzará cambio de contraseña a ${u.nombre}`, tipo: 'ok' })
+    setToast({ msg: `Para cambiar la contraseña de ${u.nombre}, el usuario debe hacerlo desde su perfil en Configuración.`, tipo: 'ok' })
   }
 
   return (

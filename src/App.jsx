@@ -165,11 +165,6 @@ function AppRouter() {
     return <AccesoBloqueado logout={logout} razon={perfil?.licenciaRazon} />
   }
 
-  /* Cambio de contraseña obligatorio */
-  if (perfil?.debeCambiarPass) {
-    return <CambiarPassObligatorio />
-  }
-
   /* Portal cliente */
   const esPro      = perfil?.plan === 'profesional' || perfil?.plan === 'enterprise'
   const esOperador = perfil?.rol === 'operador'
@@ -236,8 +231,8 @@ function AppRouter() {
           </Routes>
         </Layout>
 
-        {/* ── ChatBot (Pro) ────────────────────────────────── */}
-        {esPro && <ChatBot />}
+        {/* ── ChatBot (Pro, solo admin) ────────────────────── */}
+        {esPro && !esOperador && <ChatBot />}
 
         {/* ── Tour Driver.js ───────────────────────────────── */}
         <TourBiKloud

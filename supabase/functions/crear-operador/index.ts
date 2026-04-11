@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
       acceso_tipo:        acceso_tipo || 'general',
       sucursal_id:        acceso_tipo === 'sucursal' ? sucursal_id : null,
       modulos_permitidos: modulos_permitidos || [],
-      debe_cambiar_pass:  true,
+      debe_cambiar_pass:  false,
     })
 
     if (insertError) {

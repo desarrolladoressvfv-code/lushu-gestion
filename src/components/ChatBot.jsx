@@ -235,13 +235,13 @@ Máximo 180 palabras. Usa viñetas y emojis para el resumen.`
           }}>
           {/* Overlay que desvanece la imagen */}
           <div className="absolute inset-0 pointer-events-none"
-            style={{ background: 'linear-gradient(160deg, rgba(232,244,253,0.82) 0%, rgba(219,238,255,0.80) 50%, rgba(228,240,251,0.82) 100%)' }} />
+            style={{ background: 'linear-gradient(160deg, rgba(232,244,253,0.93) 0%, rgba(219,238,255,0.92) 50%, rgba(228,240,251,0.93) 100%)' }} />
 
           {/* Skeleton inicial */}
           {historial.length === 0 && cargando && (
             <div className="relative z-10 flex items-start gap-2.5">
               <LushuAvatar className="w-8 h-8 mt-0.5" />
-              <div className="bg-white/20 backdrop-blur-sm rounded-2xl rounded-tl-sm p-3.5 shadow-lg border border-white/30 space-y-2.5 max-w-[85%]">
+              <div className="bg-white/95 rounded-2xl rounded-tl-sm p-3.5 shadow-md border border-sky-100 space-y-2.5 max-w-[85%]">
                 <div className="skeleton h-2.5 w-44 rounded-full" />
                 <div className="skeleton h-2.5 w-56 rounded-full" />
                 <div className="skeleton h-2.5 w-36 rounded-full" />
@@ -257,10 +257,9 @@ Máximo 180 palabras. Usa viñetas y emojis para el resumen.`
               {msg.role === 'assistant' && <LushuAvatar className="w-8 h-8 mb-0.5" />}
               <div className={`max-w-[82%] px-3.5 py-2.5 rounded-2xl text-sm font-medium
                 ${msg.role === 'user'
-                  ? 'bg-blue-600/80 backdrop-blur-sm text-white rounded-br-sm shadow-lg'
-                  : 'bg-white/20 backdrop-blur-sm text-slate-900 rounded-bl-sm border border-white/30 shadow-lg'
-                }`}
-                style={{ textShadow: msg.role === 'assistant' ? '0 1px 3px rgba(255,255,255,0.8)' : 'none' }}>
+                  ? 'bg-blue-600 text-white rounded-br-sm shadow-md'
+                  : 'bg-white/95 text-slate-800 rounded-bl-sm border border-sky-100 shadow-md'
+                }`}>
                 {msg.role === 'assistant'
                   ? <MensajeTexto texto={msg.content} />
                   : <p className="leading-relaxed">{msg.content}</p>
@@ -273,7 +272,7 @@ Máximo 180 palabras. Usa viñetas y emojis para el resumen.`
           {cargando && historial.length > 0 && (
             <div className="relative z-10 flex items-end gap-2.5">
               <LushuAvatar className="w-8 h-8 mb-0.5" />
-              <div className="bg-white/20 backdrop-blur-sm rounded-2xl rounded-bl-sm px-4 py-3 shadow-lg border border-white/30">
+              <div className="bg-white/95 rounded-2xl rounded-bl-sm px-4 py-3 shadow-md border border-sky-100">
                 <TypingDots />
               </div>
             </div>
