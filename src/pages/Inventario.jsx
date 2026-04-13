@@ -288,13 +288,16 @@ export default function Inventario() {
       const errores = []
       const upserts = []
 
+      const toInsert = []
+      const toUpdate = []
+
       ws.eachRow((row, rowNum) => {
         if (rowNum === 1) return  // cabecera
         const prod    = String(row.getCell(1).value ?? '').trim()
         const suc     = String(row.getCell(2).value ?? '').trim()
         const stockA  = parseInt(row.getCell(3).value, 10) || 0
         const stockM  = parseInt(row.getCell(4).value, 10) || 0
-        if (!prod) return  // fila vacía o nota al pie
+        if (!prod || prod.startsWith('⚠')) return  // fila vacía o nota al pie
 
         const prodId = prodMap[prod.toLowerCase()]
         const sucId  = suc ? sucMap[suc.toLowerCase()] : null
@@ -306,25 +309,37 @@ export default function Inventario() {
         const existingId = invMap[key]
 
         if (existingId) {
-          upserts.push({ id: existingId, cliente_id: CLIENTE_ID, producto_id: prodId, sucursal_id: sucId ?? null, stock_actual: stockA, stock_minimo: stockM })
+          toUpdate.push({ id: existingId, stock_actual: stockA, stock_minimo: stockM })
         } else {
-          upserts.push({ cliente_id: CLIENTE_ID, producto_id: prodId, sucursal_id: sucId ?? null, stock_actual: stockA, stock_minimo: stockM })
+          toInsert.push({ cliente_id: CLIENTE_ID, producto_id: prodId, sucursal_id: sucId ?? null, stock_actual: stockA, stock_minimo: stockM })
         }
       })
 
-      if (upserts.length > 0) {
-        const { error } = await supabase.from('inventario').upsert(upserts, { onConflict: 'id' })
-        if (error) { errores.push(`Error al guardar: ${error.message}`) }
-        else {
-          setImportOk(upserts.length)
-          await cargar()
-          supabase.rpc('registrar_auditoria', {
-            p_accion: 'importar',
-            p_modulo: 'inventario',
-            p_descripcion: `Importación masiva de inventario: ${upserts.length} registros actualizados`,
-            p_referencia_id: null,
-          })
-        }
+      let totalOk = 0
+      if (toInsert.length > 0) {
+        const { error } = await supabase.from('inventario').insert(toInsert)
+        if (error) errores.push(`Error al insertar: ${error.message}`)
+        else totalOk += toInsert.length
+      }
+      if (toUpdate.length > 0) {
+        // Actualizar uno a uno para evitar problemas con upsert masivo
+        const results = await Promise.all(
+          toUpdate.map(r => supabase.from('inventario').update({ stock_actual: r.stock_actual, stock_minimo: r.stock_minimo }).eq('id', r.id))
+        )
+        const updateErrors = results.filter(r => r.error)
+        if (updateErrors.length > 0) errores.push(`Error al actualizar ${updateErrors.length} registro(s)`)
+        else totalOk += toUpdate.length
+      }
+
+      if (totalOk > 0) {
+        setImportOk(totalOk)
+        await cargar()
+        supabase.rpc('registrar_auditoria', {
+          p_accion: 'importar',
+          p_modulo: 'inventario',
+          p_descripcion: `Importación masiva de inventario: ${totalOk} registros actualizados`,
+          p_referencia_id: null,
+        })
       } else if (errores.length === 0) {
         errores.push('El archivo no contiene filas con datos válidos.')
       }
