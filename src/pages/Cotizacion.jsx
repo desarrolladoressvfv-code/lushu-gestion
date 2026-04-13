@@ -6,7 +6,7 @@ import { hoyCL } from '../lib/fecha'
 import { Download, AlertTriangle, PackageX, RotateCcw } from 'lucide-react'
 
 export default function Cotizacion() {
-  const { nombreEmpresa } = useEmpresa()
+  const { nombreEmpresa, logoUrl } = useEmpresa()
   const [productos, setProductos] = useState([])
   const [sucursales, setSucursales] = useState([])
   const [generando, setGenerando] = useState(false)
@@ -106,7 +106,7 @@ export default function Cotizacion() {
       const { data: numData } = await supabase.rpc('get_next_cotizacion', { p_cliente_id: CLIENTE_ID })
       if (numData) numeroCotizacion = numData
 
-      generarCotizacionPDF({
+      await generarCotizacionPDF({
         numeroCotizacion,
         fecha: form.fecha,
         nombreCliente: form.nombre_cliente,
@@ -128,6 +128,7 @@ export default function Cotizacion() {
         ventaTotal: venta_total,
         comentarios: form.comentarios,
         empresaNombre: nombreEmpresa,
+        logoUrl,
       })
     } finally {
       setGenerando(false)

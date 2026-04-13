@@ -5,6 +5,7 @@ import { exportarExcel } from '../lib/exportExcel'
 import { SkeletonTabla } from '../components/SkeletonLoader'
 import HistorialAuditoria from '../components/HistorialAuditoria'
 import { hoyCL } from '../lib/fecha'
+import { useEmpresa } from '../context/EmpresaContext'
 
 function diasRestantes(fecha) {
   if (!fecha) return null
@@ -27,6 +28,7 @@ const BADGE_CUOTA = {
 
 // ── Sección Cheques ────────────────────────────────────────────────────────────
 function SeccionCheques() {
+  const { logoUrl, nombreEmpresa } = useEmpresa()
   const [rows, setRows]               = useState([])
   const [loading, setLoading]         = useState(true)
   const [filtro, setFiltro]           = useState('')
@@ -67,7 +69,7 @@ function SeccionCheques() {
       'Días Restantes': diasRestantes(r.vencimiento) ?? '',
       'Estado': r.estado,
     }))
-    exportarExcel(datos, 'Cheques', 'Cheques')
+    exportarExcel(datos, 'Cheques', 'Cheques', logoUrl, nombreEmpresa)
   }
 
   const KPI_CARDS = [
@@ -204,6 +206,7 @@ function SeccionCheques() {
 
 // ── Sección Cuotas ─────────────────────────────────────────────────────────────
 function SeccionCuotas() {
+  const { logoUrl, nombreEmpresa } = useEmpresa()
   const [grupos, setGrupos]           = useState([]) // [{ fp, cliente, cuotas: [] }]
   const [loading, setLoading]         = useState(true)
   const [filtro, setFiltro]           = useState('')
@@ -323,7 +326,7 @@ function SeccionCuotas() {
           'Estado':        c.estado,
         }))
     )
-    exportarExcel(datos, 'Cuotas', 'Cuotas')
+    exportarExcel(datos, 'Cuotas', 'Cuotas', logoUrl, nombreEmpresa)
   }
 
   const KPI_CARDS = [

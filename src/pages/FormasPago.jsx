@@ -4,8 +4,10 @@ import { Search, Download, DollarSign, CreditCard, CheckSquare, AlertCircle, Cli
 import { exportarExcel } from '../lib/exportExcel'
 import { SkeletonTabla } from '../components/SkeletonLoader'
 import HistorialAuditoria from '../components/HistorialAuditoria'
+import { useEmpresa } from '../context/EmpresaContext'
 
 export default function FormasPago() {
+  const { logoUrl, nombreEmpresa } = useEmpresa()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
@@ -104,7 +106,7 @@ export default function FormasPago() {
       'Estado': r.estado,
       'Info Adicional': r.info_adicional || '',
     }))
-    exportarExcel(datos, 'FormasPago', 'Formas_de_Pago')
+    exportarExcel(datos, 'FormasPago', 'Formas_de_Pago', logoUrl, nombreEmpresa)
   }
 
   const KPI_CARDS = [

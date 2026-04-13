@@ -3,20 +3,23 @@ import { supabase, CLIENTE_ID } from '../lib/supabase'
 
 const EmpresaContext = createContext({
   nombreEmpresa:    'Mi Empresa',
+  logoUrl:          null,
   alertas:          { cheques: 0, stockBajo: 0, pagoPendiente: 0 },
   cargandoEmpresa:  true,
   errorEmpresa:     null,
   reintentarEmpresa: async () => {},
   actualizarNombre: async () => false,
+  actualizarLogo:   async () => false,
 })
 
 export function EmpresaProvider({ children }) {
   const [nombreEmpresa,   setNombreEmpresa]   = useState('Mi Empresa')
+  const [logoUrl,         setLogoUrl]         = useState(null)
   const [alertas,         setAlertas]         = useState({ cheques: 0, stockBajo: 0, pagoPendiente: 0 })
   const [cargandoEmpresa, setCargandoEmpresa] = useState(true)
-  const [errorEmpresa,    setErrorEmpresa]    = useState(null)   // M2
+  const [errorEmpresa,    setErrorEmpresa]    = useState(null)
 
-  /* ── Carga inicial: nombre de la empresa ─────── */
+  /* ── Carga inicial: nombre + logo de la empresa ─────── */
   async function cargarEmpresa() {
     try {
       const { data, error } = await supabase.rpc('get_mi_empresa')
@@ -26,6 +29,11 @@ export function EmpresaProvider({ children }) {
       setNombreEmpresa(nombre)
       document.title = `BiKloud · ${nombre}`
       setErrorEmpresa(null)
+
+      // Cargar logo_url desde la tabla clientes
+      const { data: cliente } = await supabase
+        .from('clientes').select('logo_url').eq('id', CLIENTE_ID).maybeSingle()
+      setLogoUrl(cliente?.logo_url || null)
     } catch {
       setErrorEmpresa('No se pudo cargar la información de la empresa.')
     } finally {
@@ -71,6 +79,14 @@ export function EmpresaProvider({ children }) {
     return !error && !!data
   }
 
+  /* ── Actualizar logo desde Configuración ─────────────── */
+  async function actualizarLogo(nuevaUrl) {
+    const { error } = await supabase.from('clientes')
+      .update({ logo_url: nuevaUrl }).eq('id', CLIENTE_ID)
+    if (!error) setLogoUrl(nuevaUrl || null)
+    return !error
+  }
+
   useEffect(() => {
     // Carga inicial: empresa primero, luego alertas
     cargarEmpresa().then(() => cargarAlertas())
@@ -112,11 +128,13 @@ export function EmpresaProvider({ children }) {
   return (
     <EmpresaContext.Provider value={{
       nombreEmpresa,
+      logoUrl,
       alertas,
       cargandoEmpresa,
       errorEmpresa,
       reintentarEmpresa: cargarEmpresa,
       actualizarNombre,
+      actualizarLogo,
     }}>
       {children}
     </EmpresaContext.Provider>

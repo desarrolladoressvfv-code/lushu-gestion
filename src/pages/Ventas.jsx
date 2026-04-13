@@ -3,8 +3,10 @@ import { supabase, CLIENTE_ID, clp } from '../lib/supabase'
 import { Search, Download, TrendingUp, Award, BarChart2, Building2 } from 'lucide-react'
 import { exportarExcel } from '../lib/exportExcel'
 import { SkeletonTabla } from '../components/SkeletonLoader'
+import { useEmpresa } from '../context/EmpresaContext'
 
 export default function Ventas() {
+  const { logoUrl, nombreEmpresa } = useEmpresa()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [desde, setDesde] = useState('')
@@ -63,7 +65,7 @@ export default function Ventas() {
       'IVA':            r.iva,
       'Venta Total':    r.venta_total,
     }))
-    exportarExcel(datos, 'Ventas', 'Ventas')
+    exportarExcel(datos, 'Ventas', 'Ventas', logoUrl, nombreEmpresa)
   }
 
   const KPI_CARDS = [

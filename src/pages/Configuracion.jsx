@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase, CLIENTE_ID, clp } from '../lib/supabase'
-import { Plus, Pencil, Trash2, Check, X, PlayCircle, Building2, AlertTriangle, Eye, EyeOff, KeyRound } from 'lucide-react'
+import { Plus, Pencil, Trash2, Check, X, PlayCircle, Building2, AlertTriangle, Eye, EyeOff, KeyRound, ImagePlus, Trash } from 'lucide-react'
 
 /* ── Toast ─────────────────────────────────────────────── */
 function Toast({ mensaje, tipo, onClose }) {
@@ -65,7 +65,7 @@ const TODOS_MODULOS = [
 
 // ─── Tab Mi Empresa ──────────────────────────────────────────────────────────
 function TabEmpresa() {
-  const { nombreEmpresa, cargandoEmpresa, actualizarNombre } = useEmpresa()
+  const { nombreEmpresa, logoUrl, cargandoEmpresa, actualizarNombre, actualizarLogo } = useEmpresa()
   const [valor,    setValor]    = useState('')
   const [guardando,setGuardando]= useState(false)
   const [ok,       setOk]       = useState(false)
@@ -77,10 +77,66 @@ function TabEmpresa() {
   const [okIva,        setOkIva]        = useState(false)
   const [errorIva,     setErrorIva]     = useState('')
 
+  const [subiendoLogo,  setSubiendoLogo]  = useState(false)
+  const [okLogo,        setOkLogo]        = useState(false)
+  const [errorLogo,     setErrorLogo]     = useState('')
+  const inputLogoRef = useRef(null)
+
   // Sincronizar input cuando carga el contexto
   useEffect(() => {
     if (!cargandoEmpresa) setValor(nombreEmpresa)
   }, [nombreEmpresa, cargandoEmpresa])
+
+  async function handleLogoChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) { setErrorLogo('Solo se permiten imágenes (PNG, JPG, SVG).'); return }
+    if (file.size > 2 * 1024 * 1024) { setErrorLogo('El logo no puede superar los 2 MB.'); return }
+
+    setSubiendoLogo(true)
+    setErrorLogo('')
+    try {
+      const ext  = file.name.split('.').pop().toLowerCase()
+      const path = `${CLIENTE_ID}/logo.${ext}`
+
+      const { error: upErr } = await supabase.storage
+        .from('logos').upload(path, file, { upsert: true, contentType: file.type })
+      if (upErr) throw upErr
+
+      const { data: { publicUrl } } = supabase.storage.from('logos').getPublicUrl(path)
+      // Añadir cache-buster para que el navegador recargue la imagen
+      const urlFinal = `${publicUrl}?t=${Date.now()}`
+      const exito = await actualizarLogo(urlFinal)
+      if (!exito) throw new Error('No se pudo guardar la URL del logo.')
+
+      setOkLogo(true)
+      setTimeout(() => setOkLogo(false), 3500)
+    } catch (err) {
+      setErrorLogo(err.message || 'Error al subir el logo.')
+    } finally {
+      setSubiendoLogo(false)
+      e.target.value = ''
+    }
+  }
+
+  async function eliminarLogo() {
+    setSubiendoLogo(true)
+    setErrorLogo('')
+    try {
+      // Intentar eliminar archivos de storage (sin fallar si no existen)
+      await Promise.allSettled(['png','jpg','jpeg','svg','webp'].map(ext =>
+        supabase.storage.from('logos').remove([`${CLIENTE_ID}/logo.${ext}`])
+      ))
+      const exito = await actualizarLogo(null)
+      if (!exito) throw new Error('No se pudo eliminar el logo.')
+      setOkLogo(true)
+      setTimeout(() => setOkLogo(false), 3500)
+    } catch (err) {
+      setErrorLogo(err.message || 'Error al eliminar el logo.')
+    } finally {
+      setSubiendoLogo(false)
+    }
+  }
 
   useEffect(() => {
     supabase.from('clientes').select('tasa_iva').eq('id', CLIENTE_ID).single()
@@ -257,6 +313,74 @@ function TabEmpresa() {
               </button>
             </div>
           </form>
+        )}
+      </div>
+
+      {/* ── Logo de la empresa ───────────────────────────── */}
+      <div className="form-section">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
+            <ImagePlus className="w-4 h-4 text-violet-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-slate-900 text-sm">Logo de la empresa</h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Aparece en la parte superior de los Excel descargables y en las cotizaciones PDF.
+            </p>
+          </div>
+        </div>
+
+        <input
+          ref={inputLogoRef}
+          type="file"
+          accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp"
+          className="hidden"
+          onChange={handleLogoChange}
+        />
+
+        {logoUrl ? (
+          <div className="flex items-center gap-4">
+            <div className="w-32 h-16 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
+              <img src={logoUrl} alt="Logo actual" className="max-w-full max-h-full object-contain p-1" />
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => inputLogoRef.current?.click()}
+                disabled={subiendoLogo}
+                className="btn-secondary text-sm">
+                {subiendoLogo ? 'Subiendo...' : 'Cambiar logo'}
+              </button>
+              <button
+                onClick={eliminarLogo}
+                disabled={subiendoLogo}
+                className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700 font-medium transition-colors">
+                <Trash className="w-3.5 h-3.5" /> Eliminar logo
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => inputLogoRef.current?.click()}
+            disabled={subiendoLogo}
+            className="flex items-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-slate-300
+                       hover:border-violet-400 hover:bg-violet-50 text-slate-500 hover:text-violet-700
+                       text-sm font-medium transition-all w-full justify-center">
+            <ImagePlus className="w-4 h-4" />
+            {subiendoLogo ? 'Subiendo...' : 'Subir logo (PNG, JPG, SVG — máx 2 MB)'}
+          </button>
+        )}
+
+        {okLogo && (
+          <div className="mt-3 bg-emerald-50 border border-emerald-200 text-emerald-700
+                          rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-2">
+            <Check className="w-4 h-4 flex-shrink-0" />
+            Logo actualizado correctamente
+          </div>
+        )}
+        {errorLogo && (
+          <div className="mt-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-2.5 text-sm">
+            {errorLogo}
+          </div>
         )}
       </div>
     </div>

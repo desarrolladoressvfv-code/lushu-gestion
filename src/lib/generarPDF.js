@@ -1,12 +1,13 @@
 import jsPDF from 'jspdf'
 
-export function generarCotizacionPDF(datos) {
+export async function generarCotizacionPDF(datos) {
   const {
     fecha, nombreCliente, telefono, nombreServicio, sucursalNombre,
     tipoUrna, color, lugarRetiro, lugarServicio, cementerio,
     valorServicio, valorAdicional, total, descuento, porcDescuento,
     ventaNeta, iva, ventaTotal, comentarios, empresaNombre,
-    numeroCotizacion,   // M4: número correlativo
+    numeroCotizacion,
+    logoUrl,
   } = datos
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
@@ -17,21 +18,48 @@ export function generarCotizacionPDF(datos) {
   const clp = (v) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(v ?? 0)
 
   // ── ENCABEZADO ──────────────────────────────────────────────
-  // Franja superior azul oscuro
   doc.setFillColor(15, 23, 42)
   doc.rect(0, 0, W, 38, 'F')
 
-  // Nombre empresa
-  doc.setTextColor(255, 255, 255)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(22)
-  doc.text(empresaNombre || 'Mi Empresa', margen, 16)
-
-  // Subtítulo
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(10)
-  doc.setTextColor(148, 163, 184)
-  doc.text('Servicios Fúnebres Profesionales', margen, 23)
+  // Logo (si existe)
+  if (logoUrl) {
+    try {
+      const resp       = await fetch(logoUrl)
+      const ab         = await resp.arrayBuffer()
+      const ext        = logoUrl.split('?')[0].split('.').pop().toLowerCase()
+      const formatPDF  = ext === 'png' ? 'PNG' : 'JPEG'
+      const base64     = btoa(String.fromCharCode(...new Uint8Array(ab)))
+      const dataUri    = `data:image/${ext === 'png' ? 'png' : 'jpeg'};base64,${base64}`
+      // Logo a la izquierda, contenido en 28x20mm con margen vertical
+      doc.addImage(dataUri, formatPDF, margen, 7, 0, 22, '', 'FAST')
+      // Ajustar texto para no solaparse con el logo
+      doc.setTextColor(255, 255, 255)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(148, 163, 184)
+      doc.text('Servicios Fúnebres Profesionales', margen, 34)
+    } catch {
+      // Si falla el logo, mostrar nombre de empresa
+      doc.setTextColor(255, 255, 255)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(22)
+      doc.text(empresaNombre || 'Mi Empresa', margen, 16)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(10)
+      doc.setTextColor(148, 163, 184)
+      doc.text('Servicios Fúnebres Profesionales', margen, 23)
+    }
+  } else {
+    // Sin logo: nombre de empresa
+    doc.setTextColor(255, 255, 255)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(22)
+    doc.text(empresaNombre || 'Mi Empresa', margen, 16)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    doc.setTextColor(148, 163, 184)
+    doc.text('Servicios Fúnebres Profesionales', margen, 23)
+  }
 
   // Etiqueta COTIZACIÓN + número (derecha)
   doc.setFillColor(59, 130, 246)

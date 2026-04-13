@@ -6,8 +6,10 @@ import { exportarExcel } from '../lib/exportExcel'
 import { SkeletonTabla } from '../components/SkeletonLoader'
 import Paginador, { usePaginacion } from '../components/Paginador'
 import HistorialAuditoria from '../components/HistorialAuditoria'
+import { useEmpresa } from '../context/EmpresaContext'
 
 export default function Servicios() {
+  const { logoUrl, nombreEmpresa } = useEmpresa()
   const navigate = useNavigate()
   const [rows, setRows] = useState([])
   const [productos, setProductos] = useState([])
@@ -88,7 +90,7 @@ export default function Servicios() {
       'Instalador': r.trabajadores?.nombre || '',
       'Sucursal': r.sucursales?.nombre || '',
     }))
-    exportarExcel(datos, 'Servicios', 'Servicios')
+    exportarExcel(datos, 'Servicios', 'Servicios', logoUrl, nombreEmpresa)
   }
 
   return (

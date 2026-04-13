@@ -3,8 +3,10 @@ import { supabase, CLIENTE_ID } from '../lib/supabase'
 import { ArrowUp, ArrowDown, Download } from 'lucide-react'
 import { exportarExcel } from '../lib/exportExcel'
 import { SkeletonTabla } from '../components/SkeletonLoader'
+import { useEmpresa } from '../context/EmpresaContext'
 
 export default function MovimientosInventario() {
+  const { logoUrl, nombreEmpresa } = useEmpresa()
   const [rows, setRows] = useState([])
   const [productos, setProductos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -41,7 +43,7 @@ export default function MovimientosInventario() {
       'Cantidad': r.cantidad,
       'Motivo': r.motivo || '',
     }))
-    exportarExcel(datos, 'Movimientos', 'Movimientos_Inventario')
+    exportarExcel(datos, 'Movimientos', 'Movimientos_Inventario', logoUrl, nombreEmpresa)
   }
 
   return (

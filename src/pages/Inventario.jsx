@@ -7,6 +7,7 @@ import {
 import { exportarExcel } from '../lib/exportExcel'
 import { SkeletonTabla } from '../components/SkeletonLoader'
 import HistorialAuditoria from '../components/HistorialAuditoria'
+import { useEmpresa } from '../context/EmpresaContext'
 
 /* ── Toast ─────────────────────────────────────────────── */
 function Toast({ mensaje, tipo, onClose }) {
@@ -90,6 +91,7 @@ function StockMinimoCell({ row, onGuardar }) {
 
 /* ── Módulo principal ──────────────────────────────────── */
 export default function Inventario() {
+  const { logoUrl, nombreEmpresa } = useEmpresa()
   const [rows,          setRows]          = useState([])
   const [sucursales,    setSucursales]    = useState([])
   const [loading,       setLoading]       = useState(true)
@@ -210,7 +212,7 @@ export default function Inventario() {
       'Estado':          r.stock_actual === 0 ? 'Sin Stock'
                          : r.stock_actual <= (r.stock_minimo ?? 0) ? 'Stock Bajo' : 'Normal',
     }))
-    exportarExcel(datos, 'Inventario', 'Stock_Inventario')
+    exportarExcel(datos, 'Inventario', 'Stock_Inventario', logoUrl, nombreEmpresa)
   }
 
   return (

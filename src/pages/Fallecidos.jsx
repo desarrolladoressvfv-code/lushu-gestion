@@ -4,8 +4,10 @@ import { Search, Download } from 'lucide-react'
 import { exportarExcel } from '../lib/exportExcel'
 import { SkeletonTabla } from '../components/SkeletonLoader'
 import Paginador, { usePaginacion } from '../components/Paginador'
+import { useEmpresa } from '../context/EmpresaContext'
 
 export default function Fallecidos() {
+  const { logoUrl, nombreEmpresa } = useEmpresa()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
@@ -49,7 +51,7 @@ export default function Fallecidos() {
       'Comuna': r.comuna || '',
       'Fecha Servicio': r.fecha_servicio || '',
     }))
-    exportarExcel(datos, 'Fallecidos', 'Fallecidos')
+    exportarExcel(datos, 'Fallecidos', 'Fallecidos', logoUrl, nombreEmpresa)
   }
 
   const hayFiltros = busqueda || fechaDesde || fechaHasta
