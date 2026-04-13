@@ -14,12 +14,13 @@ export async function generarCotizacionPDF(datos) {
   const W = 210
   const margen = 18
   let y = 0
+  const HEADER_H = logoUrl ? 50 : 38  // más alto cuando hay logo
 
   const clp = (v) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(v ?? 0)
 
   // ── ENCABEZADO ──────────────────────────────────────────────
   doc.setFillColor(15, 23, 42)
-  doc.rect(0, 0, W, 38, 'F')
+  doc.rect(0, 0, W, HEADER_H, 'F')
 
   // Logo (si existe) — reemplaza el nombre de la empresa
   if (logoUrl) {
@@ -45,22 +46,22 @@ export async function generarCotizacionPDF(datos) {
         img.src     = dataUri
       })
 
-      // Altura fija 22mm, ancho proporcional (máx 70mm para no invadir el badge)
-      const altMM  = 22
+      // Altura fija 44mm, ancho proporcional (máx 70mm para no invadir el badge)
+      const altMM  = 44
       const ratio  = img.naturalWidth / img.naturalHeight
       const ancMM  = Math.min(altMM * ratio, 70)
 
-      doc.addImage(dataUri, fmt, margen, (38 - altMM) / 2, ancMM, altMM)
+      doc.addImage(dataUri, fmt, margen, (HEADER_H - altMM) / 2, ancMM, altMM)
     } catch {
       // Fallback: mostrar nombre de empresa
       doc.setTextColor(255, 255, 255)
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(22)
-      doc.text(empresaNombre || 'Mi Empresa', margen, 16)
+      doc.text(empresaNombre || 'Mi Empresa', margen, HEADER_H / 2 - 2)
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(10)
       doc.setTextColor(148, 163, 184)
-      doc.text('Servicios Fúnebres Profesionales', margen, 23)
+      doc.text('Servicios Fúnebres Profesionales', margen, HEADER_H / 2 + 5)
     }
   } else {
     // Sin logo: nombre de empresa
@@ -74,22 +75,23 @@ export async function generarCotizacionPDF(datos) {
     doc.text('Servicios Fúnebres Profesionales', margen, 23)
   }
 
-  // Etiqueta COTIZACIÓN + número (derecha)
+  // Etiqueta COTIZACIÓN + número (derecha, centrada verticalmente en el header)
+  const badgeH   = numeroCotizacion ? 22 : 18
+  const badgeTop = (HEADER_H - badgeH) / 2
   doc.setFillColor(59, 130, 246)
-  doc.roundedRect(W - margen - 48, 7, 48, numeroCotizacion ? 22 : 18, 3, 3, 'F')
+  doc.roundedRect(W - margen - 48, badgeTop, 48, badgeH, 3, 3, 'F')
   doc.setTextColor(255, 255, 255)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(13)
-  doc.text('COTIZACIÓN', W - margen - 24, numeroCotizacion ? 16 : 19, { align: 'center' })
+  doc.text('COTIZACIÓN', W - margen - 24, badgeTop + (numeroCotizacion ? 9 : 11), { align: 'center' })
   if (numeroCotizacion) {
     doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(219, 234, 254)
-    const numStr = `N° ${String(numeroCotizacion).padStart(4, '0')}`
-    doc.text(numStr, W - margen - 24, 24, { align: 'center' })
+    doc.text(`N° ${String(numeroCotizacion).padStart(4, '0')}`, W - margen - 24, badgeTop + 17, { align: 'center' })
   }
 
-  y = 50
+  y = HEADER_H + 12
 
   // ── DATOS GENERALES ─────────────────────────────────────────
   doc.setTextColor(30, 41, 59)
