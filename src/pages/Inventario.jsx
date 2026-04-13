@@ -3,11 +3,13 @@ import { supabase, CLIENTE_ID } from '../lib/supabase'
 import {
   AlertTriangle, Download, Package, CheckCircle,
   XCircle, TrendingDown, DollarSign, Pencil, Check, X, History,
+  FileUp, FileDown, Upload,
 } from 'lucide-react'
 import { exportarExcel } from '../lib/exportExcel'
 import { SkeletonTabla } from '../components/SkeletonLoader'
 import HistorialAuditoria from '../components/HistorialAuditoria'
 import { useEmpresa } from '../context/EmpresaContext'
+import ExcelJS from 'exceljs'
 
 /* ── Toast ─────────────────────────────────────────────── */
 function Toast({ mensaje, tipo, onClose }) {
@@ -77,7 +79,7 @@ function StockMinimoCell({ row, onGuardar }) {
     <button
       onClick={iniciar}
       title="Clic para editar el stock mínimo"
-      className="flex items-center justify-center gap-1 group hover:text-blue-600
+      className="w-full flex items-center justify-center gap-1 group hover:text-blue-600
                  transition-colors duration-150"
     >
       <span className="font-semibold text-slate-600 group-hover:text-blue-600">
@@ -200,6 +202,142 @@ export default function Inventario() {
     },
   ]
 
+  /* ── Importar inventario ─────────────────────────────── */
+  const [modalImport,   setModalImport]   = useState(false)
+  const [importando,    setImportando]    = useState(false)
+  const [importErrors,  setImportErrors]  = useState([])
+  const [importOk,      setImportOk]      = useState(null)   // número de filas procesadas
+  const importRef = useRef(null)
+
+  async function descargarPlantilla() {
+    const [{ data: prods }, { data: sucs }] = await Promise.all([
+      supabase.from('productos').select('nombre').eq('cliente_id', CLIENTE_ID).eq('activo', true).order('numero'),
+      supabase.from('sucursales').select('nombre').eq('cliente_id', CLIENTE_ID).eq('activo', true).order('nombre'),
+    ])
+    const wb = new ExcelJS.Workbook()
+    const ws = wb.addWorksheet('Inventario')
+
+    // Cabeceras
+    ws.columns = [
+      { header: 'Producto',     key: 'producto',     width: 30 },
+      { header: 'Sucursal',     key: 'sucursal',     width: 25 },
+      { header: 'Stock Actual', key: 'stock_actual', width: 15 },
+      { header: 'Stock Mínimo', key: 'stock_minimo', width: 15 },
+    ]
+    const headerRow = ws.getRow(1)
+    headerRow.eachCell(cell => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } }
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
+      cell.alignment = { vertical: 'middle', horizontal: 'center' }
+      cell.border = { bottom: { style: 'thin', color: { argb: 'FF334155' } } }
+    })
+    headerRow.height = 22
+
+    // Fila de ejemplo por cada combinación producto × sucursal
+    const sucNombres = (sucs || []).map(s => s.nombre)
+    const prodNombres = (prods || []).map(p => p.nombre)
+    if (prodNombres.length === 0) prodNombres.push('Ejemplo Producto')
+    if (sucNombres.length === 0) sucNombres.push('Casa Central')
+
+    prodNombres.forEach((prod, pi) => {
+      sucNombres.forEach((suc, si) => {
+        const row = ws.addRow({ producto: prod, sucursal: suc, stock_actual: 0, stock_minimo: 0 })
+        const bg = (pi + si) % 2 === 0 ? 'FFF8FAFC' : 'FFFFFFFF'
+        row.eachCell(cell => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
+          cell.alignment = { vertical: 'middle', horizontal: cell.col >= 3 ? 'center' : 'left' }
+        })
+        row.height = 18
+      })
+    })
+
+    // Nota al pie
+    const noteRow = ws.addRow([])
+    ws.addRow(['⚠ No modifiques los nombres de Producto y Sucursal — deben coincidir exactamente con los del sistema.'])
+    ws.mergeCells(`A${noteRow.number + 1}:D${noteRow.number + 1}`)
+    const noteCell = ws.getCell(`A${noteRow.number + 1}`)
+    noteCell.font = { italic: true, color: { argb: 'FF94A3B8' }, size: 9 }
+
+    const buf = await wb.xlsx.writeBuffer()
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = 'Plantilla_Inventario.xlsx'; a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function procesarImport(file) {
+    setImportando(true)
+    setImportErrors([])
+    setImportOk(null)
+    try {
+      const [{ data: prods }, { data: sucs }, { data: invActual }] = await Promise.all([
+        supabase.from('productos').select('id,nombre').eq('cliente_id', CLIENTE_ID).eq('activo', true),
+        supabase.from('sucursales').select('id,nombre').eq('cliente_id', CLIENTE_ID).eq('activo', true),
+        supabase.from('inventario').select('id,producto_id,sucursal_id').eq('cliente_id', CLIENTE_ID),
+      ])
+
+      const prodMap = Object.fromEntries((prods || []).map(p => [p.nombre.trim().toLowerCase(), p.id]))
+      const sucMap  = Object.fromEntries((sucs || []).map(s => [s.nombre.trim().toLowerCase(), s.id]))
+      const invMap  = Object.fromEntries((invActual || []).map(i => [`${i.producto_id}|${i.sucursal_id ?? ''}`, i.id]))
+
+      const buf = await file.arrayBuffer()
+      const wb  = new ExcelJS.Workbook()
+      await wb.xlsx.load(buf)
+      const ws  = wb.worksheets[0]
+
+      const errores = []
+      const upserts = []
+
+      ws.eachRow((row, rowNum) => {
+        if (rowNum === 1) return  // cabecera
+        const prod    = String(row.getCell(1).value ?? '').trim()
+        const suc     = String(row.getCell(2).value ?? '').trim()
+        const stockA  = parseInt(row.getCell(3).value, 10) || 0
+        const stockM  = parseInt(row.getCell(4).value, 10) || 0
+        if (!prod) return  // fila vacía o nota al pie
+
+        const prodId = prodMap[prod.toLowerCase()]
+        const sucId  = suc ? sucMap[suc.toLowerCase()] : null
+
+        if (!prodId) { errores.push(`Fila ${rowNum}: producto "${prod}" no encontrado`); return }
+        if (suc && sucId === undefined) { errores.push(`Fila ${rowNum}: sucursal "${suc}" no encontrada`); return }
+
+        const key = `${prodId}|${sucId ?? ''}`
+        const existingId = invMap[key]
+
+        if (existingId) {
+          upserts.push({ id: existingId, cliente_id: CLIENTE_ID, producto_id: prodId, sucursal_id: sucId ?? null, stock_actual: stockA, stock_minimo: stockM })
+        } else {
+          upserts.push({ cliente_id: CLIENTE_ID, producto_id: prodId, sucursal_id: sucId ?? null, stock_actual: stockA, stock_minimo: stockM })
+        }
+      })
+
+      if (upserts.length > 0) {
+        const { error } = await supabase.from('inventario').upsert(upserts, { onConflict: 'id' })
+        if (error) { errores.push(`Error al guardar: ${error.message}`) }
+        else {
+          setImportOk(upserts.length)
+          await cargar()
+          supabase.rpc('registrar_auditoria', {
+            p_accion: 'importar',
+            p_modulo: 'inventario',
+            p_descripcion: `Importación masiva de inventario: ${upserts.length} registros actualizados`,
+            p_referencia_id: null,
+          })
+        }
+      } else if (errores.length === 0) {
+        errores.push('El archivo no contiene filas con datos válidos.')
+      }
+
+      setImportErrors(errores)
+    } catch (e) {
+      setImportErrors([`Error al leer el archivo: ${e.message}`])
+    } finally {
+      setImportando(false)
+      if (importRef.current) importRef.current.value = ''
+    }
+  }
+
   /* ── Exportar ────────────────────────────────────────── */
   function exportar() {
     const datos = filtrados.map(r => ({
@@ -222,6 +360,13 @@ export default function Inventario() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-slate-900">Stock Actual</h1>
+        <button onClick={descargarPlantilla} className="btn-secondary flex items-center gap-2 text-sm">
+          <FileDown className="w-4 h-4" /> Plantilla
+        </button>
+        <button onClick={() => { setImportErrors([]); setImportOk(null); setModalImport(true) }}
+          className="btn-secondary flex items-center gap-2 text-sm">
+          <FileUp className="w-4 h-4" /> Importar
+        </button>
         <button onClick={exportar} className="btn-excel">
           <Download className="w-4 h-4" /> Excel
         </button>
@@ -366,6 +511,73 @@ export default function Inventario() {
       )}
 
     </div>
+
+    {/* Modal importar inventario */}
+    {modalImport && (
+      <div className="modal-backdrop">
+        <div className="modal-panel w-full max-w-md">
+          <div className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-900">Importar inventario</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Carga un Excel con el formato de la plantilla</p>
+              </div>
+              <button onClick={() => setModalImport(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <ol className="text-xs text-slate-500 space-y-1 list-decimal list-inside">
+              <li>Descarga la plantilla con el botón <span className="font-semibold text-slate-700">Plantilla</span>.</li>
+              <li>Completa las columnas <span className="font-semibold text-slate-700">Stock Actual</span> y <span className="font-semibold text-slate-700">Stock Mínimo</span>.</li>
+              <li>No cambies los nombres de Producto ni Sucursal.</li>
+              <li>Sube el archivo aquí.</li>
+            </ol>
+
+            {importOk !== null && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center gap-2 text-emerald-700 text-sm">
+                <Check className="w-4 h-4 flex-shrink-0" />
+                {importOk} registro{importOk !== 1 ? 's' : ''} importado{importOk !== 1 ? 's' : ''} correctamente.
+              </div>
+            )}
+
+            {importErrors.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1 max-h-40 overflow-y-auto">
+                {importErrors.map((e, i) => (
+                  <p key={i} className="text-xs text-red-700">{e}</p>
+                ))}
+              </div>
+            )}
+
+            <label className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl p-6 cursor-pointer transition-colors
+              ${importando ? 'opacity-60 pointer-events-none' : 'border-slate-200 hover:border-blue-400 hover:bg-blue-50/30'}`}>
+              <Upload className="w-7 h-7 text-slate-400" />
+              <span className="text-sm font-medium text-slate-600">
+                {importando ? 'Procesando...' : 'Haz clic o arrastra tu archivo .xlsx'}
+              </span>
+              <span className="text-xs text-slate-400">Solo archivos .xlsx</span>
+              <input
+                ref={importRef}
+                type="file"
+                accept=".xlsx"
+                className="hidden"
+                onChange={e => { if (e.target.files?.[0]) procesarImport(e.target.files[0]) }}
+              />
+            </label>
+
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => setModalImport(false)} className="btn-secondary flex-1 justify-center text-sm">
+                Cerrar
+              </button>
+              <button onClick={descargarPlantilla} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors">
+                <FileDown className="w-4 h-4" /> Descargar plantilla
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
 
     {historialItem && (
       <div className="modal-backdrop">
