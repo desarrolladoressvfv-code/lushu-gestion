@@ -21,25 +21,38 @@ export async function generarCotizacionPDF(datos) {
   doc.setFillColor(15, 23, 42)
   doc.rect(0, 0, W, 38, 'F')
 
-  // Logo (si existe)
+  // Logo (si existe) — reemplaza el nombre de la empresa
   if (logoUrl) {
     try {
-      const resp       = await fetch(logoUrl)
-      const ab         = await resp.arrayBuffer()
-      const ext        = logoUrl.split('?')[0].split('.').pop().toLowerCase()
-      const formatPDF  = ext === 'png' ? 'PNG' : 'JPEG'
-      const base64     = btoa(String.fromCharCode(...new Uint8Array(ab)))
-      const dataUri    = `data:image/${ext === 'png' ? 'png' : 'jpeg'};base64,${base64}`
-      // Logo a la izquierda, contenido en 28x20mm con margen vertical
-      doc.addImage(dataUri, formatPDF, margen, 7, 0, 22, '', 'FAST')
-      // Ajustar texto para no solaparse con el logo
-      doc.setTextColor(255, 255, 255)
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(9)
-      doc.setTextColor(148, 163, 184)
-      doc.text('Servicios Fúnebres Profesionales', margen, 34)
+      const resp  = await fetch(logoUrl)
+      const ab    = await resp.arrayBuffer()
+      const ext   = logoUrl.split('?')[0].split('.').pop().toLowerCase()
+      const mime  = ext === 'png' ? 'image/png' : 'image/jpeg'
+      const fmt   = ext === 'png' ? 'PNG' : 'JPEG'
+
+      // Convertir a base64
+      const bytes  = new Uint8Array(ab)
+      let binary   = ''
+      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i])
+      const base64  = btoa(binary)
+      const dataUri = `data:${mime};base64,${base64}`
+
+      // Crear imagen temporal para calcular proporción
+      const img = new Image()
+      await new Promise((res, rej) => {
+        img.onload  = res
+        img.onerror = rej
+        img.src     = dataUri
+      })
+
+      // Altura fija 22mm, ancho proporcional (máx 70mm para no invadir el badge)
+      const altMM  = 22
+      const ratio  = img.naturalWidth / img.naturalHeight
+      const ancMM  = Math.min(altMM * ratio, 70)
+
+      doc.addImage(dataUri, fmt, margen, (38 - altMM) / 2, ancMM, altMM)
     } catch {
-      // Si falla el logo, mostrar nombre de empresa
+      // Fallback: mostrar nombre de empresa
       doc.setTextColor(255, 255, 255)
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(22)
