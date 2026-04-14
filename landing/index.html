@@ -1360,10 +1360,10 @@
     function cerrarModalOverlay(e) { if(e.target===document.getElementById('modal-overlay')) cerrarModal() }
     document.addEventListener('keydown', e=>{ if(e.key==='Escape') cerrarModal() })
 
-    // ─── EMAIL DESTINO ─── Reemplaza con el email donde quieres recibir las solicitudes
-    const EMAIL_DESTINO = 'fvaras@bikloud.com'
+    // ─── Edge Function URL ───────────────────────────────────────────────────────
+    const FUNCTION_URL = 'https://fdgbtihyjiplaeynwomm.supabase.co/functions/v1/solicitar-demo'
 
-    function enviarFormulario() {
+    async function enviarFormulario() {
       const nombre  = document.getElementById('f-nombre').value.trim()
       const empresa = document.getElementById('f-empresa').value.trim()
       const pais    = document.getElementById('f-pais').value
@@ -1372,6 +1372,7 @@
       const sucs    = document.getElementById('f-sucursales').value
       const comment = document.getElementById('f-comentario').value.trim()
       const errEl   = document.getElementById('form-error')
+      const btn     = document.getElementById('btn-enviar')
 
       errEl.style.display = 'none'
 
@@ -1381,27 +1382,38 @@
         return
       }
 
-      const asunto = `Nueva solicitud de demo — ${empresa}`
-      const cuerpo = [
-        `Nombre: ${nombre}`,
-        `Funeraria: ${empresa}`,
-        `Teléfono: ${pais} ${tel}`,
-        email   ? `Email: ${email}`        : '',
-        `Sucursales: ${sucs}`,
-        comment ? `Comentario: ${comment}` : '',
-        '',
-        '---',
-        'Solicitud recibida desde bikloud.com',
-      ].filter(Boolean).join('\n')
+      btn.disabled = true
+      btn.textContent = 'Enviando...'
 
-      window.location.href =
-        `mailto:${EMAIL_DESTINO}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`
+      try {
+        const res = await fetch(FUNCTION_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nombre,
+            funeraria:  empresa,
+            telefono:   `${pais} ${tel}`,
+            email,
+            sucursales: sucs,
+            comentario: comment,
+          }),
+        })
 
-      // Mostrar pantalla de éxito tras un breve delay
-      setTimeout(() => {
-        document.getElementById('modal-form').classList.add('hidden')
-        document.getElementById('modal-success').classList.add('active')
-      }, 400)
+        const data = await res.json()
+        if (data.ok) {
+          document.getElementById('modal-form').classList.add('hidden')
+          document.getElementById('modal-success').classList.add('active')
+        } else {
+          errEl.textContent = data.error || 'Error al enviar. Intenta de nuevo.'
+          errEl.style.display = 'block'
+        }
+      } catch (e) {
+        errEl.textContent = 'Error de conexión. Intenta de nuevo.'
+        errEl.style.display = 'block'
+      } finally {
+        btn.disabled = false
+        btn.textContent = 'Enviar solicitud de demo →'
+      }
     }
 
   </script>
