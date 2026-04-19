@@ -4,11 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BiKloud — Software de Gestión para Funerarias | SaaS Funerario en la Nube</title>
-  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon.ico" />
-  <link rel="icon" type="image/png" sizes="16x16" href="/favicon.ico" />
-  <link rel="shortcut icon" href="/favicon.ico" />
-  <link rel="apple-touch-icon" sizes="180x180" href="/favicon.ico" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230f172a'/%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%2360a5fa'/%3E%3Cstop offset='100%25' stop-color='%2338bdf8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='Arial Black,sans-serif' font-size='14' font-weight='900' fill='url(%23g)'%3EBK%3C/text%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230f172a'/%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%2360a5fa'/%3E%3Cstop offset='100%25' stop-color='%2338bdf8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='Arial Black,sans-serif' font-size='14' font-weight='900' fill='url(%23g)'%3EBK%3C/text%3E%3C/svg%3E" />
 
   <!-- SEO básico -->
   <meta name="description" content="BiKloud es el software de gestión funeraria en la nube para Chile y Latinoamérica. Administra servicios, inventario, cobros, cheques y reportes desde cualquier dispositivo. Prueba gratis." />
@@ -474,9 +471,12 @@
     .success-icon { font-size: 3rem; margin-bottom: 1rem; }
     .modal-success h3 { font-size: 1.2rem; font-weight: 800; color: var(--slate-900); margin-bottom: 0.5rem; }
 
-    /* ─── Mobile sticky CTA ─── */
-    #mobile-cta { display: none; position: fixed; top: 64px; left: 0; right: 0; padding: 0.6rem 1rem; z-index: 998; background: var(--white); border-bottom: 1px solid var(--slate-200); box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
-    #mobile-cta button { width: 100%; padding: 0.75rem; background: linear-gradient(135deg,var(--blue-500),var(--blue-700)); color: var(--white); font-weight: 700; font-size: 0.95rem; border: none; border-radius: 10px; cursor: pointer; font-family: inherit; }
+    /* ─── Mobile Demo button en navbar ─── */
+    .nav-demo-mobile { display: none; padding: 0.4rem 1rem; background: var(--white); color: var(--blue-700); font-weight: 700; font-size: 0.8rem; border: none; border-radius: 50px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+    nav.scrolled .nav-demo-mobile { background: var(--blue-600); color: var(--white); }
+
+    /* ─── Mobile sticky CTA (desactivado) ─── */
+    #mobile-cta { display: none; }
 
     /* ─── Responsive ─── */
     @media(max-width:900px) {
@@ -485,15 +485,16 @@
     }
     @media(max-width:640px) {
       nav { padding: 0.9rem 1.2rem; }
+      .nav-logo svg { width: 180px !important; }
       .nav-links { display: none; }
       .nav-links.open { display: flex; flex-direction: column; position: fixed; inset: 0; top: 64px; background: var(--blue-900); padding: 2rem; gap: 1.5rem; z-index: 999; align-items: flex-start; }
       .nav-links.open a { font-size: 1.2rem; color: var(--white); }
       .hamburger { display: flex; }
+      .nav-demo-mobile { display: block; }
       .footer-grid { grid-template-columns: 1fr; gap: 2rem; }
       #social-proof { gap: 1.5rem; }
       .proof-divider { display: none; }
-      #mobile-cta { display: block; }
-      body { padding-top: 116px; padding-bottom: 0; }
+      body { padding-top: 0; padding-bottom: 0; }
       .footer-bottom { flex-direction: column; align-items: flex-start; }
       .hero-btns .btn-secondary { display: none; }
       .plans-grid { grid-template-columns: 1fr; }
@@ -527,6 +528,7 @@
       <li><a href="#faq">FAQ</a></li>
       <li><a href="#" class="nav-cta" onclick="abrirModal(event)">Solicitar demo</a></li>
     </ul>
+    <button class="nav-demo-mobile" onclick="abrirModal(event)">Demo</button>
     <div class="hamburger" id="hamburger" onclick="toggleMenu()">
       <span></span><span></span><span></span>
     </div>
