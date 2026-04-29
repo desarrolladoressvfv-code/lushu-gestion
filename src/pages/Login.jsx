@@ -97,7 +97,7 @@ export default function Login() {
           {/* Frase tagline grande */}
           <p className="logo-anim-tagline text-slate-300 text-xl font-light tracking-wide text-center max-w-lg"
             style={{ animationDelay: '0.6s' }}>
-            La plataforma de gestión funeraria más completa de Chile
+            La plataforma de gestión funeraria más completa de Latinoamérica
           </p>
 
           {/* Cards */}
